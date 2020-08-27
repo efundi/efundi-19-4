@@ -48,6 +48,7 @@
                 <module>archive</module>
                 <module>assignment</module>
                 <module>basiclti</module>
+                <module>blog</module>
                 <module>calendar</module>
                 <module>chat</module>
                 <module>citations</module>
@@ -133,6 +134,7 @@
                 <module>assignment</module>
                 <module>assignment2</module>
                 <module>basiclti</module>
+                <module>blog</module>
                 <module>calendar</module>
                 <module>chat</module>
                 <module>citations</module>

@@ -1,26 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <beans xmlns="http://www.springframework.org/schema/beans"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
 
 	<bean id="org.sakaiproject.user.api.UserDirectoryProvider"
 		class="edu.amc.sakai.user.JLDAPDirectoryProvider" init-method="init"
 		destroy-method="destroy">
 		
-		<!-- Setting a MemoryService in JLDAP is deprecated! 
-			Caching is done centrally in the UserDirectoryService.callCache -->
+	
+              <!-- Setting a MemoryService in JLDAP is deprecated! 
+			Caching is done centrally in the UserDirectoryService.callCache -->	
 		
-		<!-- Required. Host name or address of your LDAP server -->
+
+              <!-- Required. Host name or address of your LDAP server -->
 		<property name="ldapHost">
-			<value>ldap.university.edu</value>
+			<value>v-ldp-lnx1.nwu.ac.za</value>
 		</property>
 
 		<!-- Optional. LDAP connection port. Typically defaults to 
 			JLDAPDirectoryProvider.DEFAULT_LDAP_PORT (389). Secured
 			connections are usually on 636 -->
-		<!-- property name="ldapPort">
+		<property name="ldapPort">
 			<value>389</value>
-		</property-->
+		</property>
 
 		<!--  If secureConnection is true, a keystore location must be provided
 			unless javax.net.ssl.trustStore system property has already been 
@@ -38,20 +40,25 @@
 
 		<!-- Optional. DN to which to bind for directory searches. 
 			Typically only necessary if autoBind is true -->
-		<!-- property name="ldapUser">
-			<value>attr=value,attr=value,attr=value</value>
-		</property -->
+		<property name="ldapUser">
+			 <value>cn=sakaiadmin,ou=system-ids,o=nwu</value>
+		</property>
 
 		<!-- Optional. Password for ldapUser defined above -->
 		<!--  property name="ldapPassword">
 			<value>usually-set-this-value-in-security-dot-properties</value>
 		</property -->
 
+                <property name="ldapPassword">
+                        <value>OrenAxNew6</value>
+                </property>
+
+
 		<!-- Optional. Enables/disables secure LDAP connections.
 			defaults to JLDAPDirectoryProvider.DEFAULT_IS_SECURE_CONNECTION (false) -->
-		<!-- property name="secureConnection">
+		<property name="secureConnection">
 			<value>false</value>
-		</property -->
+		</property>
 
 		<!-- Optional. If secureConnection is true, this socket factory
 			will be assigned globally to LDAPConnections. Defaults to an
@@ -68,10 +75,19 @@
 			<value>false</value>
 		</property -->
 
+                <property name="autoBind">
+                        <value>true</value>
+                </property>
+
+
 		<!-- Optional, but usually specified. Base DN for directory searches. -->
 		<!--  property name="basePath">
 			<value>attr=value,attr=value,attr=value</value>
 		</property -->
+ 
+                <property name="basePath">
+                        <value>ou=users,o=nwu</value>
+                </property>
 
 		<!-- Optional. Indicate if connections should follow
 			referrals. Defaults to  
@@ -83,7 +99,7 @@
 		<!-- Optional. LDAP operation timeout in millis. Defaults 
 			to JLDAPDirectoryProvider.DEFAULT_OPERATION_TIMEOUT_MILLIS (5000) -->
 		<!-- property name="operationTimeout">
-			<value>5000</value>
+			<value>10000</value>
 		</property -->
 		
 		<!-- Optional. Control depth of all searches. Possible values:
@@ -95,15 +111,15 @@
 			<value>2</value>
 		</property -->
 
-		<!-- Setting a cacheTTL in jldap-beans.xml is longer supported! 
+              <!-- NUUT Setting a cacheTTL in jldap-beans.xml is longer supported! 
 			 If you are attempting to cache your users for one hour instead of the default of 5 minutes, 
 			 set the central UserDirectoryService.callCache
 			 memory.org.sakaiproject.user.api.UserDirectoryService.callCache=timeToLiveSeconds=3600
 		-->
 
-		<!-- Setting caseSensitiveCacheKeys is no longer supported!
+	<!-- NUUT Setting caseSensitiveCacheKeys is no longer supported!
 			 We assume that user jdoe is the same as user JDoe!! -->
-		
+	
 		<!--  Optional. Control the return value of 
 		      JLDAPDirectoryProvider.authenticateWithProviderFirst(String)
 		      on a global basis. Defaults to
@@ -136,13 +152,18 @@
 			<value>false</value>
 		</property -->
 
+                <property name="pooling">
+                        <value>true</value>
+                </property>
+
+
 		<!-- Optional. Maxmimum number of connections in the pool
 			Defaults to JLDAPDirectoryProvider.DEFAULT_POOL_MAX_CONNS (10) -->
-		<!--  property name="poolMaxConns">
-			<value>10</value>
-		</property -->
-
-		<!-- Optional. Size of batch when loading multiple users at once.
+		<property name="poolMaxConns">
+			<value>200</value>
+		</property>
+		
+                <!-- NUUT Optional. Size of batch when loading multiple users at once.
 		     Defaults to DEFAULT_BATCH_SIZE = 200 -->
 		<!-- property name="batchSize">
 		  <value>200</value>
@@ -155,13 +176,9 @@
 		  <value>1000</value>
 		</property -->
 
-		<!-- Optional. Require a different ID for login. This allows you to have one ID for logins
-		     and another EID which is used when looking up course/group information.
-		     Defaults to false -->
-		<!-- property name="enableAid">
-		  <value>true</value>
-		</property -->
-		
+
+
+
 		<!-- Optional. Defaults to an instance of 
 		edu.amc.sakai.user.SimpleLdapAttributeMapper -->
 		<property name="ldapAttributeMapper">
@@ -180,6 +197,15 @@
 				</entry>
 			</map>
 		</property -->
+
+               <property name="attributeMappings">
+                        <map>
+                                <entry key="id">
+                                        <value>eid</value>
+                                </entry>
+                        </map>
+                </property>
+
 		
 		<!-- Optional. If you don't provide an eidValidator the system
 		defaults to allowing searches on any EID, including empty
@@ -217,7 +243,6 @@
 		AttributeMappingConstants.DEFAULT_ATTR_MAPPINGS. -->
 		<!-- property name="attributeMappings">
 			<map>
-				<entry key="aid"><value>krb5PrincipalName</value></entry>
 				<entry key="login"><value>cn</value></entry>         
 				<entry key="firstName"><value>givenName</value></entry> 
 				<entry key="preferredFirstName"><value>preferredName</value></entry>
@@ -227,20 +252,25 @@
 				<entry key="jpegPhoto"><value>jpegPhoto</value></entry>   
 			</map>
 		</property -->
-		
-		<!-- If any of the values need manipulating with message formats they can be set here. -->
-		<!-- property name="valueMappings">
-			<map>
-				<entry key="displayId"><value>{0}@example.edu</value></entry>
-			</map>
-		</property -->
 
+                 <property name="attributeMappings">
+                        <map>
+                                <entry key="login"><value>cn</value></entry>
+                                <entry key="distinguishedName"><value>dn</value></entry>
+                                <entry key="firstName"><value>givenName</value></entry>
+                                <entry key="lastName"><value>sn</value></entry>
+                                <entry key="email"><value>mail</value></entry>
+                                <entry key="groupMembership"><value>memberOf</value></entry>
+                        </map>
+                </property>
+
+		
 		<!-- Several options for calculating Sakai user types based
 		on LDAP attributes. Defaults to an instance of EmptyStringUserTypeMapper -->
 		<property name="userTypeMapper">
 			<!-- Select one of the following beans -->
-			<ref bean="edu.amc.sakai.user.EmptyStringUserTypeMapper" />
-			<!-- ref bean="edu.amc.sakai.user.EntryAttributeToUserTypeMapper" /-->
+			<!--ref bean="edu.amc.sakai.user.EmptyStringUserTypeMapper" /-->
+			<ref bean="edu.amc.sakai.user.EntryAttributeToUserTypeMapper" />
 			<!-- ref bean="edu.amc.sakai.user.EntryContainerRdnToUserTypeMapper" /-->
 			<!-- ref bean="edu.amc.sakai.user.StringUserTypeMapper" /-->
 		</property>
@@ -265,9 +295,9 @@
 	<bean id="edu.amc.sakai.user.StringUserTypeMapper"
 		class="edu.amc.sakai.user.StringUserTypeMapper">
 		
-		<!--  property name="userType">
+		  <property name="userType">
 			<value>Registered</value>
-		</property -->
+		</property>
 		
 	</bean>
 		
@@ -286,6 +316,22 @@
 				<entry key="students"><value>student</value></entry> 
 			</map>
 		</property -->
+            
+                <property name="attributeValueToSakaiUserTypeMap">
+                        <!--map>
+                                <entry key="cn=P,ou=orgunits,ou=groups,o=nwu"><value>Instructor</value></entry>
+                        </map-->
+                        <map>
+                                <entry key="cn=efundi-instructors,ou=orgunits,ou=groups,o=nwu"><value>Instructor</value></entry>
+                        </map>
+
+                        <!--map>
+                                <entry key="Personnel"><value>instructor</value></entry>
+                                <entry key="Students"><value>registered</value></entry>
+                        </map -->
+
+                </property>
+
 				
 		<!-- Required. The logical name of the LDAP attribute which
 		defines Sakai users' types. Value should be a key into the 
@@ -296,15 +342,15 @@
 		</property>
 				
 		<!-- Optional. Defaults to false -->
-		<!--  property name="returnLiteralAttributeValueIfNoMapping">
+		<property name="returnLiteralAttributeValueIfNoMapping">
 			<value>false</value>
-		</property -->
+		</property>
 				
 		<!-- Optional. Only considered if returnLiteralAttributeValueIfNoMapping
 			is false. Defaults to null. -->
-		<!--  property name="defaultSakaiUserType">
-			<null />
-		</property -->
+		<property name="defaultSakaiUserType">
+			<value>registered</value>
+		</property>
 		
 	</bean>
 	
@@ -320,11 +366,6 @@
 				<entry key="facultyStaff"><value>faculty</value></entry> 
 				<entry key="students"><value>student</value></entry> 
 			</map>
-		</property -->
-
-		<!-- Optional. Defaults to false.  -->
-		<!-- property name="recurseRdnIfNoMapping">
-			<value>false</value>
 		</property -->
 				
 		<!-- Optional. Defaults to false.  -->

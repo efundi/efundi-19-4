@@ -33,16 +33,16 @@ $header-font-weight: 700 !default;										// 400 or 700 as you wish
 
 /* Color palette */
 $background-color: 			 #FFFFFF !default;
-$background-color-secondary: #000036 !default;
+$background-color-secondary: #6f327a !default;
 
-$primary-color:    			 #15597e !default;
+$primary-color:    			#265b81 !default;
 $primary-color-highContrast: darken( $primary-color, 4% ) !default;	// for use of primary on non-white light backgrounds, such as greys
 $primary-color-shadow:			 adjust-hue( $primary-color, 5 ) !default;	// To give primary a darker shadow
 $secondary-color:  			 #F00 !default;
 $alt-colour: 				 #d36f00 !default;
 
 $text-color:				 #212121 !default;
-$text-color-disabled:		 #767676 !default;
+$text-color-disabled:		 #767676 !default; //Ciellie kyk hierna
 
 $body-background-color: #FAFAFA !default;
 
@@ -52,7 +52,7 @@ $portal-mask-background:  rgba(0,0,0,0.5) !default;
 /* Tool tabs */
 $tool-background-color:		 $background-color !default;
 $tool-menu-background-color:			 $body-background-color !default;
-$tool-menu-color: 			 #424242 !default;
+$tool-menu-color: 			 #6f327a !default;
 $tool-border-color:			 #E5E5E5 !default;
 
 $tool-tab-height:                                         32px !default;
@@ -152,7 +152,7 @@ $header-gradient-d: $header-gradient-a !default;
 /* topNav Main Menu */
 $header-size: 50px !default;
 $topNav-text-color:                         #fff !default; 		// used for links and text in the topNav
-$topNav-alt-color:                     		#9c9c9c !default;	// used for topNav spacers
+$topNav-alt-color:                     		#ccc !default;	// used for topNav spacers
 
 /* Favorites */
 $sites-nav-menu-item-border-thickness:		1px !default;
@@ -355,9 +355,9 @@ $standard-space: 4px !default; 		// the width of a keyboard space
 $banner-height: 52px !default;
 
 /* Logo location */
-$logo: 'images/logo-jewel.png' !default;
+$logo: 'images/logo.png' !default;
 $logo-height: 36px !default;
-$logo-width: 126px !default;
+$logo-width: 100px !default;
 
 /* Tool icons */
 $skin-with-icons: true !default;

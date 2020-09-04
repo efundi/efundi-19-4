@@ -25,14 +25,24 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import lombok.extern.slf4j.Slf4j;
 
+import org.sakaiproject.authz.api.AuthzGroupService;
 import org.sakaiproject.authz.api.GroupProvider;
+import org.sakaiproject.authz.api.Member;
 import org.sakaiproject.coursemanagement.api.CourseManagementService;
 import org.sakaiproject.coursemanagement.api.Section;
 import org.sakaiproject.coursemanagement.api.exception.IdNotFoundException;
+import org.sakaiproject.exception.IdUnusedException;
+import org.sakaiproject.site.api.Site;
+import org.sakaiproject.site.api.SiteService;
+import org.sakaiproject.tool.api.Placement;
+import org.sakaiproject.tool.api.Session;
+import org.sakaiproject.tool.api.SessionManager;
+import org.sakaiproject.tool.api.ToolManager;
 
 /**
  * A Sakai GroupProvider that utilizes the CourseManagementService and the
@@ -53,6 +63,10 @@ public class CourseManagementGroupProvider implements GroupProvider {
 
 	/** The course management service */
 	CourseManagementService cmService;
+	SiteService siteService;
+	ToolManager toolManager;
+	AuthzGroupService authzGroupService;
+	SessionManager sessionManager;
 			
 	/** The role resolvers to use when looking for CM roles in the hierarchy*/
 	List<RoleResolver> roleResolvers;
@@ -87,6 +101,9 @@ public class CourseManagementGroupProvider implements GroupProvider {
 		String[] sectionEids = unpackId(id);
 		if(log.isDebugEnabled()) log.debug(id + " is mapped to " + sectionEids.length + " sections");
 
+		Site currentSite = getCurrentSite();    
+		boolean isCreate = isCreate(currentSite);
+		
 		for (RoleResolver rr : roleResolvers) {
 			for(int i=0; i < sectionEids.length; i++) {
 				String sectionEid = sectionEids[i];
@@ -115,18 +132,78 @@ public class CourseManagementGroupProvider implements GroupProvider {
 					// Add or replace the role in the map if this is a more preferred role than the previous role
 					if(existingRole == null) {
 						if(log.isDebugEnabled()) log.debug("Adding "+ userEid + " to userRoleMap with role=" + rrRole);
-						userRoleMap.put(userEid, rrRole);
+						addUserAccordingToValidation(userRoleMap, currentSite,
+								isCreate, userEid, rrRole);
 					} else if(preferredRole(existingRole, rrRole).equals(rrRole)){
 						if(log.isDebugEnabled()) log.debug("Changing "+ userEid + "'s role in userRoleMap from " + existingRole + " to " + rrRole + " for section " + sectionEid);
-						userRoleMap.put(userEid, rrRole);
+						addUserAccordingToValidation(userRoleMap, currentSite,
+								isCreate, userEid, rrRole);
 					}
 				}
+				isCreate = false;
 			}
 		}
 		if(log.isDebugEnabled()) log.debug("_____________getUserRolesForGroup=" + userRoleMap);
 		return userRoleMap;
 	}
+	
+	private void addUserAccordingToValidation(Map<String, String> userRoleMap,
+            Site currentSite, boolean isCreate, String userEid, String rrRole) {
+        if(isCreate || isBusyWithLinkStudentsToSiteJob() || currentSite == null || isMemberOfCurrentSite(currentSite, userEid)){
+            userRoleMap.put(userEid, rrRole);
+        }
+    }
+	
+	private boolean isBusyWithLinkStudentsToSiteJob() {
+        Session session = sessionManager.getCurrentSession();       
+        String sessionAttribute = (String) session.getAttribute("LinkStudentsToSiteJob");
+        if(sessionAttribute != null && sessionAttribute.equals("true")){
+            return true;
+        }
+        return false;
+    }
 
+    private boolean isCreate(Site currentSite) {
+        if(currentSite != null){
+            Set<Member> siteMembers = currentSite.getMembers();
+            //during site create, only one user in list
+            if(siteMembers.size() == 1){
+                for (Member member : siteMembers) {
+                    if(currentSite.getCreatedBy().getEid().equals(member.getUserEid())){
+                        return true;
+                    }
+                }
+            }   
+        }
+        return false;
+    }
+
+    private boolean isMemberOfCurrentSite(Site currentSite, String userEid){
+        if(currentSite != null){
+            Set<Member> siteMembers = currentSite.getMembers();
+            for (Member member : siteMembers) {
+                if(userEid.equals(member.getUserEid())){
+                    return true;
+                }
+            }   
+        }
+        return false;
+    }
+
+    private Site getCurrentSite() {
+        Placement placement = toolManager.getCurrentPlacement();
+        if (placement == null) {
+            return null;
+        }
+        try {
+            return siteService.getSite(placement.getContext());
+
+        } catch (IdUnusedException e) {
+            log.warn("The current site could not be established.", e);
+            return null;
+        }
+    }
+    
 	public Map<String, String> getGroupRolesForUser(String userEid, String academicSessionEid) {
 		log.debug("------------------CMGP.getGroupRolesForUser({})", userEid);
 		Map<String, String> groupRoleMap = new HashMap<>();
@@ -265,6 +342,22 @@ public class CourseManagementGroupProvider implements GroupProvider {
 		this.cmService = cmService;
 	}
 
+	public void setSiteService(SiteService siteService) {
+		this.siteService = siteService;
+	}
+
+	public void setToolManager(ToolManager toolManager) {
+		this.toolManager = toolManager;
+	}
+
+	public void setAuthzGroupService(AuthzGroupService authzGroupService) {
+		this.authzGroupService = authzGroupService;
+	}
+
+	public void setSessionManager(SessionManager sessionManager) {
+		this.sessionManager = sessionManager;
+	}
+	
 	public void setRoleResolvers(List<RoleResolver> roleResolvers) {
 		this.roleResolvers = roleResolvers;
 	}

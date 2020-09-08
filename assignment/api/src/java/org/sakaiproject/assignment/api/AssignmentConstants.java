@@ -123,6 +123,30 @@ public final class AssignmentConstants {
      */
     public static final String EVENT_GRADE_ASSIGNMENT_SUBMISSION = "asn.grade.submission";
     /**
+     * Event for adding a marker to a assignment. NAM-44
+     */
+    public static final String EVENT_MARKER_ASSIGNMENT_ADD = "asn.marker.add";
+    /**
+     * Event for adding a marker to a assignment. NAM-44
+     */
+    public static final String EVENT_MARKER_ASSIGNMENT_EDIT = "asn.marker.edit";
+    /**
+     * Event for reassigning a marker to a assignment. NAM-44
+     */
+    public static final String EVENT_MARKER_ASSIGNMENT_REASSIGN = "asn.marker.reassign";
+    /**
+     * Event for a marker downloading assignment(s) from the marker UI. NAM-44
+     */
+    public static final String EVENT_MARKER_ASSIGNMENT_DOWNLOAD = "asn.marker.download";
+    /**
+     * Event for a marker uploading assignment(s) via the marker UI. NAM-44
+     */
+    public static final String EVENT_MARKER_ASSIGNMENT_UPLOAD = "asn.marker.upload";
+    /**
+     * Event for a marker uploading assignment(s) via the marker UI. NAM-44
+     */
+    public static final String EVENT_MARKER_QUOTA_CALCULATION = "asn.marker.quota.calculation";
+    /**
      * Calendar event field for assignment due dates
      */
     public static final String NEW_ASSIGNMENT_DUEDATE_CALENDAR_ASSIGNMENT_ID = "new_assignment_duedate_calendar_assignment_id";
@@ -147,6 +171,7 @@ public final class AssignmentConstants {
     public static final String ASSN_SUBMISSION_TYPE_NON_ELECTRONIC_PROP = "nonelec";
     public static final String ASSN_SUBMISSION_TYPE_SINGLE_ATTACHMENT_PROP = "singleatt";
     public static final String ASSN_SUBMISSION_TYPE_UNKNOWN_PROP = "submission.type.unknown";
+    public static final String ASSN_SUBMISSION_TYPE_PDF_ONLY_PROP = "pdfonly"; //NAM-26 display text link for the new assignment submission type
     /**
      * Ungraded grade type string
      */

@@ -465,6 +465,7 @@ public class AssignmentAction extends PagedResourceActionII {
      */
     private static final String ENABLE_REVIEW_SERVICE = "enable_review_service";
     private static final String EXPORT_ASSIGNMENT_ID = "export_assignment_id";
+    private static final String MARKER_PARTIAL_DOWNLOAD_FLAG = "marker_partial_download_flag";
     /**
      * ***************** instructor's new assignment ******************************
      */
@@ -503,6 +504,9 @@ public class AssignmentAction extends PagedResourceActionII {
     private static final String NEW_ASSIGNMENT_ATTACHMENT = "new_assignment_attachment";
     private static final String NEW_ASSIGNMENT_SECTION = "new_assignment_section";
     private static final String NEW_ASSIGNMENT_SUBMISSION_TYPE = "new_assignment_submission_type";
+    private static final String NEW_ASSIGNMENT_USE_MARKER = "new_assignment_use_marker";
+    private static final String NEW_ASSIGNMENT_MARKERS = "new_assignment_markers";
+    private static final String NEW_ASSIGNMENT_MARKERS_HISTORY = "new_assignment_markers_history";
     private static final String NEW_ASSIGNMENT_CATEGORY = "new_assignment_category";
     private static final String NEW_ASSIGNMENT_GRADE_TYPE = "new_assignment_grade_type";
     private static final String NEW_ASSIGNMENT_GRADE_POINTS = "new_assignment_grade_points";
@@ -641,6 +645,19 @@ public class AssignmentAction extends PagedResourceActionII {
      */
     private static final String MODE_OPTIONS = "options"; // set in velocity template
     /**
+     *  NAM-34
+     *  The marker download view
+     */
+    private static final String MODE_MARKER_DOWNLOADS_STATISTICS = "markerdownstats";
+    /**
+     * The marker view of download file
+     */
+    private static final String MODE_MARKER_DOWNLOAD = "markerDownload";
+    /**
+     * The marker view of upload download file
+     */
+    private static final String MODE_MARKER_UPLOAD = "markerUpload";
+    /**
      * Review Edit page for students
      */
     private static final String MODE_STUDENT_REVIEW_EDIT = "Assignment.mode_student_review_edit"; // set in velocity template
@@ -744,6 +761,11 @@ public class AssignmentAction extends PagedResourceActionII {
      */
     private static final String TEMPLATE_OPTIONS = "_options";
     /**
+     *  NAM-34
+     *  The Marker Downlaods Statistics page
+     */
+    private static final String TEMPLATE_MARKER_DOWNLOADS_STATISTICS = "_marker_downloads_statistics";
+    /**
      * The opening mark comment
      */
     private static final String COMMENT_OPEN = "{{";
@@ -832,6 +854,7 @@ public class AssignmentAction extends PagedResourceActionII {
     private static final String HAS_MULTIPLE_ASSIGNMENTS = "has_multiple_assignments";
     // view all or grouped submission list
     private static final String VIEW_SUBMISSION_LIST_OPTION = "view_submission_list_option";
+    private static final String VIEW_MARKER_STATS_OPTION = "view_marker_stats_option";
     /************************* SAK-17606 - Upload all grades.csv columns ********************/
     private static final int IDX_GRADES_CSV_EID = 1;
     private static final int IDX_GRADES_CSV_GRADE = 5;
@@ -1087,6 +1110,16 @@ public class AssignmentAction extends PagedResourceActionII {
 
         String contextString = (String) state.getAttribute(STATE_CONTEXT_STRING);
 
+        // NAM-34 and NAM-36 check if current user has marker permissions and the marker property is set to true in sakai.properties
+        // allow marker assignment?
+        boolean allowUserMarkerDownloadAndStats = assignmentService.allowUserMarkerDownloadAndStats(contextString);
+        context.put("allowUserMarkerDownloadAndStats", Boolean.valueOf(allowUserMarkerDownloadAndStats));
+        context.put("loginUserDispName", userDirectoryService.getCurrentUser().getEid());
+
+        // check if assignment marker is enabled?
+        boolean isEnabledAssignmentMarker = serverConfigurationService.getBoolean("assignment.useMarker", false);
+        context.put("isEnabledAssignmentMarker", isEnabledAssignmentMarker);
+        
         // allow add assignment?
         boolean allowAddAssignment = assignmentService.allowAddAssignment(contextString);
         context.put("allowAddAssignment", Boolean.valueOf(allowAddAssignment));
@@ -1313,6 +1346,24 @@ public class AssignmentAction extends PagedResourceActionII {
             case MODE_STUDENT_VIEW_ASSIGNMENT_HONORPLEDGE:
                 template = build_student_view_assignment_honorPledge_context(portlet, context, data, state);
                 break;
+            case MODE_MARKER_DOWNLOADS_STATISTICS:
+            	if (allowGradeSubmission != null && (Boolean) allowGradeSubmission) {
+	        		// build the options page
+	            	template = build_marker_downloads_statistics_context(portlet, context, data, state);
+            	}
+            	break;
+            case MODE_MARKER_DOWNLOAD:
+            	if (allowGradeSubmission != null && (Boolean) allowGradeSubmission) {
+                	// if allowed for grading, build the context for the marker's view of downloading info to archive file
+                	template = build_marker_download_upload(portlet, context, data, state);
+            	}
+				break;
+			case MODE_MARKER_UPLOAD:
+            	if (allowGradeSubmission != null && (Boolean) allowGradeSubmission) {
+                	// if allowed for grading, build the context for the marker's view of uploading info to archive file
+                	template = build_marker_download_upload(portlet, context, data, state);
+            	}
+				break;
         }
 
         if (template == null) {
@@ -1734,6 +1785,9 @@ public class AssignmentAction extends PagedResourceActionII {
             return true;
         }
         if (submissionType == Assignment.SubmissionType.SINGLE_ATTACHMENT_SUBMISSION) {
+            return true;
+        }
+        if (submissionType == Assignment.SubmissionType.PDF_ONLY_SUBMISSION) { //NAM-26 check if that submission type exists
             return true;
         }
 
@@ -2820,6 +2874,19 @@ public class AssignmentAction extends PagedResourceActionII {
             context.put("assignmentGroups", state.getAttribute(NEW_ASSIGNMENT_GROUPS));
         }
 
+        //NAM-32        
+        if(serverConfigurationService.getBoolean("assignment.useMarker", false)) {
+            if (state.getAttribute(NEW_ASSIGNMENT_MARKERS) == null) {
+            	state.setAttribute(NEW_ASSIGNMENT_MARKERS, assignmentService.buildAssignmentMarkerObjSetForSite(contextString));
+            }
+            context.put("assignmentMarkers", state.getAttribute(NEW_ASSIGNMENT_MARKERS));
+            //check if marker option was selected
+            if (a != null && a.getIsMarker()) {
+            	state.setAttribute(NEW_ASSIGNMENT_USE_MARKER, a.getIsMarker());
+            	context.put("markerEnabled", true);
+            }
+        }
+        
         context.put("allowGroupAssignmentsInGradebook", Boolean.TRUE);
 
         // the notification email choices
@@ -4217,6 +4284,11 @@ public class AssignmentAction extends PagedResourceActionII {
             context.put("download_url_link_label", rb.getString("download_url_link_label"));
             state.removeAttribute(STATE_DOWNLOAD_URL);
         }
+        
+        if (serverConfigurationService.getBoolean("assignment.useMarker", false) && Assignment.SubmissionType.PDF_ONLY_SUBMISSION == assignment.getTypeOfSubmission()
+        		&& assignment.getIsMarker()) {
+    		context.put("isMarkingUsed", Boolean.TRUE);
+        }
 
         String template = (String) getContext(data).get("template");
 
@@ -4233,7 +4305,7 @@ public class AssignmentAction extends PagedResourceActionII {
         try {
             sst = siteService.getSite(contextString);
 
-            Map<User, AssignmentSubmission> submitters = assignmentService.getSubmitterMap(Boolean.FALSE.toString(), "all", null, aRef, contextString);
+            Map<User, AssignmentSubmission> submitters = assignmentService.getSubmitterMap(Boolean.FALSE.toString(), "all", null, aRef, contextString, false, false);
             for (User u : submitters.keySet()) {
                 if (candidateDetailProvider != null && !candidateDetailProvider.getAdditionalNotes(u, sst).isPresent()) {
                     log.debug("Skipping user with no additional notes " + u.getEid());
@@ -4899,7 +4971,7 @@ public class AssignmentAction extends PagedResourceActionII {
             context.put("includeSubmissionText", Assignment.SubmissionType.TEXT_ONLY_ASSIGNMENT_SUBMISSION == submissionType || Assignment.SubmissionType.TEXT_AND_ATTACHMENT_ASSIGNMENT_SUBMISSION == submissionType);
 
             // if the assignment is of attachment-only or allow both text and attachment, include option for uploading student attachment
-            context.put("includeSubmissionAttachment", Assignment.SubmissionType.ATTACHMENT_ONLY_ASSIGNMENT_SUBMISSION == submissionType || Assignment.SubmissionType.TEXT_AND_ATTACHMENT_ASSIGNMENT_SUBMISSION == submissionType || Assignment.SubmissionType.SINGLE_ATTACHMENT_SUBMISSION == submissionType);
+            context.put("includeSubmissionAttachment", Assignment.SubmissionType.ATTACHMENT_ONLY_ASSIGNMENT_SUBMISSION == submissionType || Assignment.SubmissionType.TEXT_AND_ATTACHMENT_ASSIGNMENT_SUBMISSION == submissionType || Assignment.SubmissionType.SINGLE_ATTACHMENT_SUBMISSION == submissionType || Assignment.SubmissionType.PDF_ONLY_SUBMISSION == submissionType);
 
             context.put("viewString", state.getAttribute(VIEW_SUBMISSION_LIST_OPTION) != null ? state.getAttribute(VIEW_SUBMISSION_LIST_OPTION) : "");
 
@@ -4911,6 +4983,66 @@ public class AssignmentAction extends PagedResourceActionII {
         String template = getContext(data).get("template");
         return template + TEMPLATE_INSTRUCTOR_UPLOAD_ALL;
     } // build_instructor_upload_all
+    
+    /**
+     * build the marker view to download/upload information from archive file
+     */
+    private String build_marker_download_upload(VelocityPortlet portlet, Context context, RunData data, SessionState state) {        
+        String assignmentRef = (String) state.getAttribute(EXPORT_ASSIGNMENT_REF);
+        Assignment a = getAssignment(assignmentRef, "build_marker_download_upload", state);
+
+        context.put("hasSubmissionText", Boolean.TRUE);
+        context.put("hasSubmissionAttachment", Boolean.TRUE);
+        context.put("hasGradeFile", Boolean.TRUE);
+        context.put("gradeFileFormat", "csv");
+        context.put("hasComments", Boolean.TRUE);
+        context.put("hasFeedbackText", Boolean.TRUE);
+        context.put("hasFeedbackAttachment", Boolean.TRUE);
+        context.put("isMarker", Boolean.TRUE);
+
+
+        boolean isDownload = MODE_MARKER_DOWNLOAD.equals(state.getAttribute(STATE_MODE));
+        if(isDownload) {
+            context.put("download", Boolean.TRUE);
+            Boolean isPartialDownload = (Boolean) state.getAttribute(MARKER_PARTIAL_DOWNLOAD_FLAG);
+            if(isPartialDownload) {
+            	context.put("markerDownloadPartial", Boolean.TRUE);
+            	context.put("markerDownloadAll", Boolean.FALSE);
+            } else {
+            	context.put("markerDownloadAll", Boolean.TRUE);
+            	context.put("markerDownloadPartial", Boolean.FALSE);
+            }
+        } else {
+            context.put("download", Boolean.FALSE);
+        	context.put("markerDownloadPartial", Boolean.FALSE);
+        	context.put("markerDownloadAll", Boolean.FALSE);  
+        }
+
+        if (a != null) {
+            context.put("accessPointUrl", serverConfigurationService.getAccessUrl().concat(assignmentRef));
+
+            Assignment.SubmissionType submissionType = a.getTypeOfSubmission();
+            // if the assignment is of text-only or allow both text and attachment, include option for uploading student submit text
+            context.put("includeSubmissionText", Assignment.SubmissionType.PDF_ONLY_SUBMISSION == submissionType);
+
+            // if the assignment is of attachment-only or allow both text and attachment, include option for uploading student attachment
+            context.put("includeSubmissionAttachment", Assignment.SubmissionType.PDF_ONLY_SUBMISSION == submissionType);
+
+            context.put("viewString", state.getAttribute(VIEW_SUBMISSION_LIST_OPTION) != null ? state.getAttribute(VIEW_SUBMISSION_LIST_OPTION) : "");
+
+            context.put("searchString", state.getAttribute(VIEW_SUBMISSION_SEARCH) != null ? state.getAttribute(VIEW_SUBMISSION_SEARCH) : "");
+
+            context.put("showSubmissionByFilterSearchOnly", state.getAttribute(SUBMISSIONS_SEARCH_ONLY) != null && ((Boolean) state.getAttribute(SUBMISSIONS_SEARCH_ONLY)) ? Boolean.TRUE : Boolean.FALSE);
+        }
+
+        context.put("releaseGrades", state.getAttribute(UPLOAD_ALL_RELEASE_GRADES));
+        context.put("withoutFolders", state.getAttribute(UPLOAD_ALL_WITHOUT_FOLDERS));
+        context.put("enableFlatDownload", serverConfigurationService.getBoolean("assignment.download.flat", false));
+        context.put("contextString", state.getAttribute(STATE_CONTEXT_STRING));
+
+        String template = getContext(data).get("template");
+        return template + TEMPLATE_INSTRUCTOR_UPLOAD_ALL;
+    } // build_marker_download_upload
 
     /**
      * integration with gradebook
@@ -5350,6 +5482,27 @@ public class AssignmentAction extends PagedResourceActionII {
         state.removeAttribute(VIEW_SUBMISSION_SEARCH);
 	}
 
+    /**
+     * Dispatcher for view marker download/upload options
+     */
+    public void doView_marker_stats_option(RunData data) {
+        SessionState state = ((JetspeedRunData) data).getPortletSessionState(((JetspeedRunData) data).getJs_peid());
+
+        ParameterParser params = data.getParameters();
+        String option = params.getString("option");
+        if ("markerPartialDownload".equals(option)) {
+            // go to download all page
+            doPrep_marker_download(data, true);
+        } else if ("markerUpload".equals(option)) {
+            // go to upload all page
+            doPrep_marker_upload_all(data);
+        } else if ("markerDownload".equals(option)) {
+            // go to download all page
+            doPrep_marker_download(data, false);
+        }
+
+    } // doView_marker_list_option
+    
     /**
      * Action is to view the content of one specific assignment submission
      */
@@ -6106,6 +6259,7 @@ public class AssignmentAction extends PagedResourceActionII {
         String aReference = (String) state.getAttribute(VIEW_SUBMISSION_ASSIGNMENT_REFERENCE);
         Assignment a = getAssignment(aReference, "post_save_submission", state);
 
+        Boolean isMarkerResubmit =  false;
         if (assignmentService.canSubmit(a)) {
             ParameterParser params = data.getParameters();
             // retrieve the submission text (as formatted text)
@@ -6221,7 +6375,11 @@ public class AssignmentAction extends PagedResourceActionII {
                 if (submission != null) {
                     // the submission already exists, change the text and honor pledge value, post it
                     Map<String, String> properties = submission.getProperties();
-
+					
+					if (a.getIsMarker()) {
+                    	isMarkerResubmit = checkForResubmissionForMarkerAllocation(submission, properties.get(AssignmentConstants.ALLOW_RESUBMIT_NUMBER) != null);
+                    }
+                    
                     if (a.getIsGroup()) {
                         if (StringUtils.isNotBlank(original_group_id) && !StringUtils.equals(original_group_id, group_id)) {
                             // changing group id so we need to check if a submission has already been made for that group
@@ -6417,6 +6575,22 @@ public class AssignmentAction extends PagedResourceActionII {
                         assignmentService.postReviewableSubmissionAttachments(submission);
                     }
                 }
+                try {
+					if (a.getIsMarker() && !securityService.isUserRoleSwapped() && submission.getSubmitted()) {
+						Boolean submissionAssigned = false;
+						if (!isMarkerResubmit) {
+							submissionAssigned = assignmentService.markerQuotaCalculation(a, submission);
+						} else {
+							submissionAssigned = assignmentService.markerUpdateResubmission(a, submission);
+						}
+						if (!submissionAssigned) {
+							log.warn("Could not assign submission: {}", submission.getId());
+						}
+					}
+				} catch (IdUnusedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
             }
 
             if (state.getAttribute(STATE_MESSAGE) == null) {
@@ -6425,6 +6599,17 @@ public class AssignmentAction extends PagedResourceActionII {
         }
     } // post_save_submission
 
+    //We want to ignore a resubmission as sakai does change the assignment content info in the db already.
+  	private boolean checkForResubmissionForMarkerAllocation(AssignmentSubmission submission,
+  			Boolean resubmissionProperty) {
+  		if (submission.getSubmitted() && (submission.getDateSubmitted() != null || submission.getSubmitted())
+  				&& resubmissionProperty) {
+  			return true;
+  		} else {
+  			return false;
+  		}
+  	}
+    
     /**
      * Takes the inline submission, prepares it as an attachment to the submission and queues the attachment with the content review service
      */
@@ -6600,6 +6785,12 @@ public class AssignmentAction extends PagedResourceActionII {
                 List v = getNonInlineAttachments(state, assignment);
                 if ((v == null) || (v.size() != 1)) {
                     addAlert(state, rb.getString("youmust8"));
+                }
+            } else if (submissionType == Assignment.SubmissionType.PDF_ONLY_SUBMISSION) { //NAM-27
+                // for the single PDF uploaded file only submission
+                List v = getNonInlineAttachments(state, assignment);
+                if ((v == null) || (v.size() != 1)) {
+                    addAlert(state, rb.getString("youmust3"));
                 }
             } else {
                 // for the inline and attachment submission / other submission types
@@ -7171,6 +7362,88 @@ public class AssignmentAction extends PagedResourceActionII {
             }
         }
 
+        Boolean isMarker = false;
+        String value = params.getString("new_assignment_submission_type");
+        state.setAttribute(NEW_ASSIGNMENT_SUBMISSION_TYPE, Integer.parseInt(params.getString("new_assignment_submission_type")));
+
+        if (params.getString("allowMarkerToggle") != null) {
+        	isMarker = (params.getString("allowMarkerToggle").equals("on") ? Boolean.TRUE : Boolean.FALSE);
+        }
+
+        state.setAttribute(NEW_ASSIGNMENT_USE_MARKER, isMarker);
+
+		if (serverConfigurationService.getBoolean("assignment.useMarker", false) && Assignment.SubmissionType.PDF_ONLY_SUBMISSION == Assignment.SubmissionType.values()[(Integer) state.getAttribute(NEW_ASSIGNMENT_SUBMISSION_TYPE)]
+				&& isMarker )  {
+			if (state.getAttribute(NEW_ASSIGNMENT_MARKERS) != null) {
+				Set<AssignmentMarker> siteAssignmentMarkers = new HashSet<AssignmentMarker>();
+				Set<AssignmentMarkerHistory> markerHistorySet = new HashSet<AssignmentMarkerHistory>();
+				Set<AssignmentMarker> assignmentMarkers = (Set<AssignmentMarker>) state
+						.getAttribute(NEW_ASSIGNMENT_MARKERS);
+				Iterator<AssignmentMarker> assignmentMarkerSetIter = assignmentMarkers.iterator();
+				int index = 1;
+				AssignmentMarker marker = null;
+				Map<String, AssignmentMarker> assignmentMarkersMap = new HashMap<>();
+				Double quotaPercentage = 0.0;
+				while (assignmentMarkerSetIter.hasNext()) {
+					marker = assignmentMarkerSetIter.next();
+
+					if(StringUtils.isNotBlank(params.getString("quota" + index))) {
+						quotaPercentage = Double.valueOf(params.getString("quota" + index));
+					} else {
+						quotaPercentage = marker.getQuotaPercentage();
+					}
+
+					marker.setQuotaPercentage(quotaPercentage);
+					siteAssignmentMarkers.add(marker);
+					assignmentMarkersMap.put(marker.getMarkerUserId(), marker);
+					index++;
+				}
+
+				int indexHist = 1;
+				assignmentMarkerSetIter = assignmentMarkers.iterator();
+				while (assignmentMarkerSetIter.hasNext()) {
+					marker = assignmentMarkerSetIter.next();
+					if (StringUtils.isNotBlank(params.getString("reassignSelect" + indexHist))
+							&& StringUtils.isNotBlank(params.getString("assignmentMarkerUserId" + indexHist))) {
+						AssignmentMarkerHistory markerHistory = null;
+						String reassignMarkerId = params.getString("reassignSelect" + indexHist);
+						String currentMarkerId = params.getString("assignmentMarkerUserId" + indexHist);
+						markerHistory = new AssignmentMarkerHistory();
+
+						AssignmentMarker newAssignmentMarker = assignmentMarkersMap.get(reassignMarkerId);
+						AssignmentMarker currentAssignmentMarker = assignmentMarkersMap.get(currentMarkerId);
+
+						Double newQuota = Double.sum(newAssignmentMarker.getQuotaPercentage(),
+								currentAssignmentMarker.getQuotaPercentage());
+						markerHistory.setNewQuotaPercentage(newQuota);
+
+						// assign the new quota value to the new/reassigned marker
+						newAssignmentMarker.setQuotaPercentage(newQuota);
+						markerHistory.setNewMarkerId(reassignMarkerId);
+						markerHistory.setOldQuotaPercentage(currentAssignmentMarker.getQuotaPercentage());
+
+						// assign the original marker with a 0 quota value
+						currentAssignmentMarker.setQuotaPercentage(new Double(0));
+						markerHistory.setOldMarkerId(currentMarkerId);
+
+						markerHistory.setModifier(userDirectoryService.getCurrentUser().getId());
+						markerHistorySet.add(markerHistory);
+						//call to do reassignment of actual submissions.
+						assignmentService.reassignSubmissionsNotMarked(currentAssignmentMarker, newAssignmentMarker, assignmentRef);
+					}
+					indexHist++;
+				}
+
+				if (CollectionUtils.isNotEmpty(siteAssignmentMarkers)) {
+					state.setAttribute(NEW_ASSIGNMENT_MARKERS, siteAssignmentMarkers);
+				}
+
+				if (CollectionUtils.isNotEmpty(markerHistorySet)) {
+					state.setAttribute(NEW_ASSIGNMENT_MARKERS_HISTORY, markerHistorySet);
+				}				
+			}
+		}
+        
         // allow resubmission numbers
         if (params.getString("allowResToggle") != null && params.getString(AssignmentConstants.ALLOW_RESUBMIT_NUMBER) != null) {
             // read in allowResubmit params
@@ -7837,7 +8110,9 @@ public class AssignmentAction extends PagedResourceActionII {
                 useReviewService = a.getContentReview();
                 allowStudentViewReport = Boolean.valueOf(p.get(NEW_ASSIGNMENT_ALLOW_STUDENT_VIEW));
             }
-
+            
+            //Add isMarker value
+            boolean isMarker = Boolean.valueOf((Boolean) state.getAttribute(NEW_ASSIGNMENT_USE_MARKER));
             String submitReviewRepo = (String) state.getAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_SUBMIT_RADIO);
             String generateOriginalityReport = (String) state.getAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_REPORT_RADIO);
             boolean checkTurnitin = "true".equalsIgnoreCase((String) state.getAttribute(NEW_ASSIGNMENT_REVIEW_SERVICE_CHECK_TURNITIN));
@@ -7945,7 +8220,7 @@ public class AssignmentAction extends PagedResourceActionII {
                 }
 
                 // persist the Assignment changes
-                commitAssignment(state, post, a, assignmentReference, title, submissionType, useReviewService, allowStudentViewReport,
+                commitAssignment(state, post, a, assignmentReference, title, submissionType, useReviewService, isMarker, allowStudentViewReport,
                         gradeType, gradePoints, description, checkAddHonorPledge, attachments, section, range,
                         visibleTime, openTime, dueTime, closeTime, hideDueDate, enableCloseDate, emailReminder, isGroupSubmit, groups,
                         usePeerAssessment, peerPeriodTime, peerAssessmentAnonEval, peerAssessmentStudentViewReviews, peerAssessmentNumReviews, peerAssessmentInstructions,
@@ -8006,6 +8281,37 @@ public class AssignmentAction extends PagedResourceActionII {
                     }
                 }
 
+              //NAM-32 - Set Assignment Object after created on Marker
+                if(serverConfigurationService.getBoolean("assignment.useMarker", false) && Assignment.SubmissionType.PDF_ONLY_SUBMISSION == a.getTypeOfSubmission()
+        				&& isMarker ) {
+    				Set<AssignmentMarker> assignmentMarkers = (Set<AssignmentMarker>) state.getAttribute(NEW_ASSIGNMENT_MARKERS);       
+    				if (CollectionUtils.isNotEmpty(assignmentMarkers)) {
+        				Iterator<AssignmentMarker> assignmentMarkerSetIter = assignmentMarkers.iterator();
+        				while (assignmentMarkerSetIter.hasNext()) {
+        					AssignmentMarker marker = assignmentMarkerSetIter.next();
+        					marker.setAssignment(a); 
+                            try {
+                            	assignmentService.updateAssignmentMarker(marker);
+                            } catch (Exception e) {
+                                log.warn(".post_save_assignment: Error saving AssignmentMarkers for site with id {}", siteId);
+                            }
+        				}
+    				}    				
+    				Set<AssignmentMarkerHistory> reassignedMarkers = (Set<AssignmentMarkerHistory>) state.getAttribute(NEW_ASSIGNMENT_MARKERS_HISTORY);    				
+    				if (CollectionUtils.isNotEmpty(reassignedMarkers)) {
+    					Iterator<AssignmentMarkerHistory> markerHistSetIter = reassignedMarkers.iterator();
+        				while (markerHistSetIter.hasNext()) {
+        					AssignmentMarkerHistory markerHistory = markerHistSetIter.next();
+    						markerHistory.setContext(a.getContext());
+    	                    try {
+    	                    	assignmentService.createAssignmentMarkerHistory(markerHistory);
+    	                    } catch (Exception e) {
+    	                        log.warn(".post_save_assignment: Error saving AssignmentMarkerHistory for site with id {}", siteId);
+    	                    }
+        				}
+    				}    				
+                }
+                
                 if (post) {
                     // we need to update the submission
                     if (bool_change_from_non_point || bool_change_resubmit_option) {
@@ -8803,6 +9109,7 @@ public class AssignmentAction extends PagedResourceActionII {
                                   String title,
                                   Assignment.SubmissionType submissionType,
                                   boolean useReviewService,
+                                  boolean isMarker,
                                   boolean allowStudentViewReport,
                                   Assignment.GradeType gradeType,
                                   String gradePoints,
@@ -8850,6 +9157,7 @@ public class AssignmentAction extends PagedResourceActionII {
         a.setHideDueDate(hideDueDate);
         a.setTypeOfSubmission(submissionType);
         a.setContentReview(useReviewService);
+        a.setIsMarker(isMarker);
         a.setTypeOfGrade(gradeType);
 
         a.setOpenDate(openTime);
@@ -9383,6 +9691,13 @@ public class AssignmentAction extends PagedResourceActionII {
                 // put the names and values into vm file
                 state.setAttribute(NEW_ASSIGNMENT_TITLE, a.getTitle());
                 state.setAttribute(NEW_ASSIGNMENT_ORDER, a.getPosition());
+                
+                Set<AssignmentMarker> assignmentMarkers = assignmentService.getMarkersForAssignment(a);
+                if (CollectionUtils.isNotEmpty(assignmentMarkers)) {
+                	state.setAttribute(NEW_ASSIGNMENT_MARKERS, assignmentMarkers);
+                } else {
+                	state.setAttribute(NEW_ASSIGNMENT_MARKERS, assignmentService.buildAssignmentMarkerObjSetForSite(toolManager.getCurrentPlacement().getContext()));
+                }
 
                 if (serverConfigurationService.getBoolean("assignment.visible.date.enabled", false)) {
                     putTimePropertiesInState(state, a.getVisibleDate(), NEW_ASSIGNMENT_VISIBLEMONTH, NEW_ASSIGNMENT_VISIBLEDAY, NEW_ASSIGNMENT_VISIBLEYEAR, NEW_ASSIGNMENT_VISIBLEHOUR, NEW_ASSIGNMENT_VISIBLEMIN);
@@ -10435,6 +10750,9 @@ public class AssignmentAction extends PagedResourceActionII {
             } else if ("options".equals(option)) {
                 // go to the options view
                 doOptions(data);
+            } else if("markerdownstats".equals(option)) { // NAM-34
+            	// go to the marker downloads statistics view
+                doMarkerDownStats(data);
             }
 
         }
@@ -10567,7 +10885,7 @@ public class AssignmentAction extends PagedResourceActionII {
             }
 
             // need also to upload local file if any
-            doAttachUpload(data, false);
+            doAttachUpload(data, false, false); //NAM-27
 
             // TODO: file picker to save in dropbox? -ggolden
             // User[] users = { userDirectoryService.getCurrentUser() };
@@ -11569,6 +11887,11 @@ public class AssignmentAction extends PagedResourceActionII {
 
         state.setAttribute(NEW_ASSIGNMENT_FOCUS, NEW_ASSIGNMENT_TITLE);
 
+        if(serverConfigurationService.getBoolean("assignment.useMarker", false)) {
+            state.setAttribute(NEW_ASSIGNMENT_MARKERS, assignmentService.buildAssignmentMarkerObjSetForSite(toolManager.getCurrentPlacement().getContext()));
+            state.setAttribute(NEW_ASSIGNMENT_USE_MARKER, Boolean.FALSE);
+        }
+        
         state.removeAttribute(NEW_ASSIGNMENT_DESCRIPTION_EMPTY);
 
         // reset the global navigaion alert flag
@@ -11727,6 +12050,12 @@ public class AssignmentAction extends PagedResourceActionII {
         state.removeAttribute(RUBRIC_STATE_DETAILS);
 
         state.removeAttribute(NEW_ASSIGNMENT_PREVIOUSLY_ASSOCIATED);
+
+        //NAM-32
+        state.removeAttribute(NEW_ASSIGNMENT_MARKERS);
+        //NAM-33
+        state.removeAttribute(NEW_ASSIGNMENT_MARKERS_HISTORY);
+        state.removeAttribute(NEW_ASSIGNMENT_USE_MARKER);
     } // resetNewAssignment
 
     /**
@@ -11776,7 +12105,12 @@ public class AssignmentAction extends PagedResourceActionII {
         submissionTypeTable.put(3, rb.getString(AssignmentConstants.ASSN_SUBMISSION_TYPE_INLINE_AND_ATTACHMENTS_PROP));
         submissionTypeTable.put(4, rb.getString(AssignmentConstants.ASSN_SUBMISSION_TYPE_NON_ELECTRONIC_PROP));
         submissionTypeTable.put(5, rb.getString(AssignmentConstants.ASSN_SUBMISSION_TYPE_SINGLE_ATTACHMENT_PROP));
-
+        
+        //NAM-28 Checks if the pdf marker tool should be displayed or not
+        if (serverConfigurationService.getBoolean("assignment.useMarker", false)) {
+        	submissionTypeTable.put(6, rb.getString(AssignmentConstants.ASSN_SUBMISSION_TYPE_PDF_ONLY_PROP)); //NAM-26 adding new submission type to table data
+        }
+        
         return submissionTypeTable;
     } // submissionTypeTable
 
@@ -12271,7 +12605,7 @@ public class AssignmentAction extends PagedResourceActionII {
                             }
                         }
                     } else {
-                        Map<User, AssignmentSubmission> submitters = assignmentService.getSubmitterMap(searchFilterOnly.toString(), allOrOneGroup, search, aRef, contextString);
+                        Map<User, AssignmentSubmission> submitters = assignmentService.getSubmitterMap(searchFilterOnly.toString(), allOrOneGroup, search, aRef, contextString, false, false);
                         // construct the user-submission list
                         for (User u : submitters.keySet()) {
                             String uId = u.getId();
@@ -12296,6 +12630,9 @@ public class AssignmentAction extends PagedResourceActionII {
             }
             case MODE_LIST_DELETED_ASSIGNMENTS:
                 returnResources.addAll(assignmentService.getDeletedAssignmentsForContext((String) state.getAttribute(STATE_CONTEXT_STRING)));
+                break;
+            case MODE_MARKER_DOWNLOADS_STATISTICS:
+                returnResources.addAll(assignmentService.getAssignmentsForContext((String) state.getAttribute(STATE_CONTEXT_STRING)));
                 break;
         }
 
@@ -12725,10 +13062,10 @@ public class AssignmentAction extends PagedResourceActionII {
             doRemove_newSingleUploadedFile(data);
         } else if ("upload".equals(option)) {
             // upload local file
-            doAttachUpload(data, true);
+            doAttachUpload(data, true, false); //NAM-27
         } else if ("uploadSingleFile".equals(option)) {
             // upload single local file
-            doAttachUpload(data, false);
+            doAttachUpload(data, false, false); //NAM-27
         }
     }
 
@@ -12802,7 +13139,7 @@ public class AssignmentAction extends PagedResourceActionII {
         String search = (String) state.getAttribute(VIEW_SUBMISSION_SEARCH);
         Boolean searchFilterOnly = (state.getAttribute(SUBMISSIONS_SEARCH_ONLY) != null && ((Boolean) state.getAttribute(SUBMISSIONS_SEARCH_ONLY)) ? Boolean.TRUE : Boolean.FALSE);
 
-        Map<User, AssignmentSubmission> submitters = assignmentService.getSubmitterMap(searchFilterOnly.toString(), allOrOneGroup, search, aRef, contextString);
+        Map<User, AssignmentSubmission> submitters = assignmentService.getSubmitterMap(searchFilterOnly.toString(), allOrOneGroup, search, aRef, contextString, false, false);
 
         return new ArrayList<>(submitters.values());
     }
@@ -13132,8 +13469,12 @@ public class AssignmentAction extends PagedResourceActionII {
 
     public void doDownload_all(RunData data) {
         SessionState state = ((JetspeedRunData) data).getPortletSessionState(((JetspeedRunData) data).getJs_peid());
-        state.setAttribute(STATE_MODE, MODE_INSTRUCTOR_GRADE_ASSIGNMENT);
         ParameterParser params = data.getParameters();
+        if(StringUtils.isNotBlank(params.getString("isMarker"))) {
+        	state.setAttribute(STATE_MODE, MODE_MARKER_DOWNLOADS_STATISTICS);
+        } else {
+        	state.setAttribute(STATE_MODE, MODE_INSTRUCTOR_GRADE_ASSIGNMENT);
+        }
         String downloadUrl = params.getString("downloadUrl");
         state.setAttribute(STATE_DOWNLOAD_URL, downloadUrl);
     }
@@ -13225,7 +13566,25 @@ public class AssignmentAction extends PagedResourceActionII {
                     Assignment assignment = getAssignment(aReference, "doUpload_all", state);
                     if (assignment != null) {
                         associateGradebookAssignment = assignment.getProperties().get(PROP_ASSIGNMENT_ASSOCIATE_GRADEBOOK_ASSIGNMENT);
-                        submissions = assignmentService.getSubmissions(assignment);
+                        if (assignment.getIsMarker()) {
+                        	AssignmentSubmission submission = null;
+                        	List<AssignmentSubmissionMarker> submissionsForMarker = assignmentService.findSubmissionMarkersByIdAndAssignmentId(assignment.getId(), userDirectoryService.getCurrentUser().getEid());
+                        	submissions = new HashSet<AssignmentSubmission>();
+                        	for(AssignmentSubmissionMarker submissionMarker : submissionsForMarker) {
+                        		try {
+									submission = assignmentService.getSubmission(submissionMarker.getAssignmentSubmission().getId());
+	                        		if(submission != null) {
+	                            		submissions.add(submission);
+	                        		}   
+								} catch (IdUnusedException e) {
+                                    log.warn(this + ":doUpload_all getSubmission " + e.getMessage());
+								} catch (PermissionException e) {
+                                    log.warn(this + ":doUpload_all getSubmission " + e.getMessage());
+								}                     		
+                        	}
+                        } else {
+                            submissions = assignmentService.getSubmissions(assignment);
+                        }
                         for (AssignmentSubmission s : submissions) {
                             String eid = null;
                             if (assignment.getIsGroup()) {
@@ -13273,7 +13632,11 @@ public class AssignmentAction extends PagedResourceActionII {
         if (state.getAttribute(STATE_MESSAGE) == null) {
             // go back to the list of submissions view
             cleanUploadAllContext(state);
-            state.setAttribute(STATE_MODE, MODE_INSTRUCTOR_GRADE_ASSIGNMENT);
+            if(StringUtils.isNotBlank(params.getString("isMarker"))) {
+            	state.setAttribute(STATE_MODE, MODE_MARKER_DOWNLOADS_STATISTICS);
+            } else {
+            	state.setAttribute(STATE_MODE, MODE_INSTRUCTOR_GRADE_ASSIGNMENT);
+            }
         }
     }
 
@@ -13765,16 +14128,35 @@ public class AssignmentAction extends PagedResourceActionII {
 
                     // commit
                     try {
-                        assignmentService.updateSubmission(submission);
-                        if (releaseGrades && graded) {
-                            // update grade in gradebook
-                            if (associateGradebookAssignment != null) {
-                                integrateGradebook(state, aReference, associateGradebookAssignment, null, null, null, -1, null, sReference, "update", -1);
-                            }
-                        }
-                    } catch (PermissionException e) {
-                        log.warn("Could not update submission: {}, {}", submission.getId(), e.getMessage());
-                    }
+						assignmentService.updateSubmission(submission);
+						if (releaseGrades && graded) {
+							// update grade in gradebook
+							if (associateGradebookAssignment != null) {
+								integrateGradebook(state, aReference, associateGradebookAssignment, null, null, null, -1, null, sReference, "update", -1);
+							}
+						}
+
+						if (assignment.getIsMarker()) {
+							AssignmentSubmissionMarker submissionMarker = null;
+							AssignmentMarker assignmentMarker = null;
+							for (AssignmentSubmissionSubmitter submitter : submission.getSubmitters()) {
+								submissionMarker = assignmentService.findSubmissionMarkerForMarkerIdAndSubmissionId(
+										userDirectoryService.getCurrentUser().getEid(), submission.getId());
+								if (submissionMarker != null) {
+									if (!submissionMarker.getUploaded()) {
+										assignmentMarker = submissionMarker.getAssignmentMarker();
+										assignmentMarker.setNumberUploaded(assignmentMarker.getNumberUploaded() + 1);
+										assignmentService.updateAssignmentMarker(assignmentMarker);
+									}
+									submissionMarker.setUploaded(Boolean.TRUE);
+									assignmentService.updateAssignmentSubmissionMarker(submissionMarker,
+											AssignmentConstants.EVENT_MARKER_ASSIGNMENT_UPLOAD);
+								}
+							}
+						}
+					} catch (PermissionException e) {
+						log.warn("Could not update submission: {}, {}", submission.getId(), e.getMessage());
+					}
                 }
             }
         }
@@ -13934,7 +14316,12 @@ public class AssignmentAction extends PagedResourceActionII {
      */
     public void doCancel_download_upload_all(RunData data) {
         SessionState state = ((JetspeedRunData) data).getPortletSessionState(((JetspeedRunData) data).getJs_peid());
-        state.setAttribute(STATE_MODE, MODE_INSTRUCTOR_GRADE_ASSIGNMENT);
+        ParameterParser params = data.getParameters();
+        if(StringUtils.isNotBlank(params.getString("isMarker"))) {
+        	state.setAttribute(STATE_MODE, MODE_MARKER_DOWNLOADS_STATISTICS);
+        } else {
+        	state.setAttribute(STATE_MODE, MODE_INSTRUCTOR_GRADE_ASSIGNMENT);
+        }
         cleanUploadAllContext(state);
     }
 
@@ -13967,6 +14354,20 @@ public class AssignmentAction extends PagedResourceActionII {
     } // doPrep_download_all
 
     /**
+     * Action is to preparing to go to the download all file for marker
+     */
+    public void doPrep_marker_download(RunData data, boolean isPartialDownload) {
+        SessionState state = ((JetspeedRunData) data).getPortletSessionState(((JetspeedRunData) data).getJs_peid());
+        ParameterParser params = data.getParameters();
+        String assignmentReference = params.getString("assignmentId");
+        state.setAttribute(EXPORT_ASSIGNMENT_REF, assignmentReference);	    
+        String view = params.getString("view");
+        state.setAttribute(VIEW_MARKER_STATS_OPTION, view);
+	    state.setAttribute(STATE_MODE, MODE_MARKER_DOWNLOAD);
+	    state.setAttribute(MARKER_PARTIAL_DOWNLOAD_FLAG, isPartialDownload ? Boolean.TRUE : Boolean.FALSE);
+    } // doPrep_marker_download_all
+    
+    /**
      * Action is to preparing to go to the upload files
      */
     public void doPrep_upload_all(RunData data) {
@@ -13976,6 +14377,17 @@ public class AssignmentAction extends PagedResourceActionII {
 
     } // doPrep_upload_all
 
+    /**
+     * Action is to preparing to go to the upload files
+     */
+    public void doPrep_marker_upload_all(RunData data) {
+        SessionState state = ((JetspeedRunData) data).getPortletSessionState(((JetspeedRunData) data).getJs_peid());
+        ParameterParser params = data.getParameters();
+        String assignmentReference = params.getString("assignmentId");
+        state.setAttribute(EXPORT_ASSIGNMENT_REF, assignmentReference);
+        state.setAttribute(STATE_MODE, MODE_MARKER_UPLOAD);
+    } // doPrep_marker_upload_all
+    
     private List<DecoratedTaggingProvider> initDecoratedProviders() {
         List<DecoratedTaggingProvider> providers = new ArrayList<DecoratedTaggingProvider>();
         for (TaggingProvider provider : taggingManager.getProviders()) {
@@ -14233,10 +14645,19 @@ public class AssignmentAction extends PagedResourceActionII {
         // save the current input before leaving the page
         SessionState state = ((JetspeedRunData) data).getPortletSessionState(((JetspeedRunData) data).getJs_peid());
         saveSubmitInputs(state, data.getParameters());
-        doAttachUpload(data, false);
+        doAttachUpload(data, false, false); //NAM-27
         if (MODE_STUDENT_REVIEW_EDIT.equals(state.getAttribute(STATE_MODE))) {
             saveReviewGradeForm(data, state, "save");
         }
+    }
+    
+    /**
+     * single PDF file upload
+     *
+     * @param data
+     */
+    public void doAttachUploadSinglePDF(RunData data) { //NAM-27
+        doAttachUpload(data, true, true);
     }
 
     /**
@@ -14245,7 +14666,7 @@ public class AssignmentAction extends PagedResourceActionII {
      * @param data
      */
     public void doAttachUploadSingle(RunData data) {
-        doAttachUpload(data, true);
+        doAttachUpload(data, true, false);
     }
 
     /**
@@ -14254,7 +14675,7 @@ public class AssignmentAction extends PagedResourceActionII {
      * @param data
      * @param singleFileUpload
      */
-    public void doAttachUpload(RunData data, boolean singleFileUpload) {
+    public void doAttachUpload(RunData data, boolean singleFileUpload, boolean pdfFileUpload) { //NAM-27
         if (!"POST".equals(data.getRequest().getMethod())) {
             return;
         }
@@ -14290,7 +14711,7 @@ public class AssignmentAction extends PagedResourceActionII {
             // "The user submitted a file to upload but it was too big!"
             addAlert(state, rb.getFormattedMessage("size.exceeded", max_file_size_mb));
             //addAlert(state, hrb.getString("size") + " " + max_file_size_mb + "MB " + hrb.getString("exceeded2"));
-        } else if (singleFileUpload && (fileitem.getFileName() == null || fileitem.getFileName().length() == 0)) {
+        } else if ((singleFileUpload || pdfFileUpload) && (fileitem.getFileName() == null || fileitem.getFileName().length() == 0)) {
             // only if in the single file upload case, need to warn user to upload a local file
             addAlert(state, rb.getString("choosefile7"));
         } else if (fileitem.getFileName().length() > 0) {
@@ -14298,98 +14719,102 @@ public class AssignmentAction extends PagedResourceActionII {
             InputStream fileContentStream = fileitem.getInputStream();
             String contentType = fileitem.getContentType();
 
+            if (pdfFileUpload && !contentType.equals("application/pdf")) { //NAM-27
+            	addAlert(state, rb.getFormattedMessage("attnotpdf", filename));
+            } else {
             InputStreamReader reader = new InputStreamReader(fileContentStream);
 
-            try {
-                //check the InputStreamReader to see if the file is 0kb aka empty
-                if (!reader.ready()) {
-                    addAlert(state, rb.getFormattedMessage("attempty", filename));
-                } else {
-                    // we just want the file name part - strip off any drive and path stuff
-                    String name = Validator.getFileName(filename);
-                    String resourceId = Validator.escapeResourceName(name);
-
-                    // make a set of properties to add for the new resource
-                    ResourcePropertiesEdit props = contentHostingService.newResourceProperties();
-                    props.addProperty(ResourceProperties.PROP_DISPLAY_NAME, name);
-                    props.addProperty(ResourceProperties.PROP_DESCRIPTION, filename);
-
-                    // make an attachment resource for this URL
-                    SecurityAdvisor sa = createSubmissionSecurityAdvisor();
-                    try {
-                        String siteId = toolManager.getCurrentPlacement().getContext();
-
-                        // add attachment
-                        // put in a security advisor so we can create citationAdmin site without need
-                        // of further permissions
-                        securityService.pushAdvisor(sa);
-                        ContentResource attachment = contentHostingService.addAttachmentResource(resourceId, siteId, "Assignments", contentType, fileContentStream, props);
-
-                        Site s = null;
-                        try {
-                            s = siteService.getSite(siteId);
-                        } catch (IdUnusedException iue) {
-                            log.warn(this + ":doAttachUpload: Site not found!" + iue.getMessage());
-                        }
-
-                        // Check if the file is acceptable with the ContentReviewService
-                        boolean blockedByCRS = false;
-                        if (!inPeerReviewMode && assignmentService.allowReviewService(s)) {
-                            String assignmentReference = (String) state.getAttribute(VIEW_SUBMISSION_ASSIGNMENT_REFERENCE);
-                            Assignment a = getAssignment(assignmentReference, "doAttachUpload", state);
-                            if (a.getContentReview()) {
-                                if (!contentReviewService.isAcceptableContent(attachment)) {
-                                    addAlert(state, rb.getFormattedMessage("review.file.not.accepted", new Object[]{contentReviewService.getServiceName(), getContentReviewAcceptedFileTypesMessage()}));
-                                    blockedByCRS = true;
-                                    // TODO: delete the file? Could we have done this check without creating it in the first place?
-                                }
-                            }
-                        }
-
-                        if (!blockedByCRS) {
-                            try {
-                                Reference ref = entityManager.newReference(contentHostingService.getReference(attachment.getId()));
-                                if (singleFileUpload && attachments.size() > 1) {
-                                    //SAK-26319	- the assignment type is 'single file upload' and the user has existing attachments, so they must be uploading a 'newSingleUploadedFile'	--bbailla2
-                                    state.setAttribute("newSingleUploadedFile", ref);
-                                } else {
-                                    attachments.add(ref);
-                                }
-                            } catch (Exception ee) {
-                                log.warn(this + "doAttachUpload cannot find reference for " + attachment.getId() + ee.getMessage());
-                            }
-                        }
-
-                        if (inPeerReviewMode) {
-                            state.setAttribute(PEER_ATTACHMENTS, attachments);
-                        } else {
-                            state.setAttribute(ATTACHMENTS, attachments);
-                        }
-                    } catch (PermissionException e) {
-                        addAlert(state, rb.getString("notpermis4"));
-                    } catch (RuntimeException e) {
-                        if (contentHostingService.ID_LENGTH_EXCEPTION.equals(e.getMessage())) {
-                            // couldn't we just truncate the resource-id instead of rejecting the upload?
-                            addAlert(state, rb.getFormattedMessage("alert.toolong", new String[]{name}));
-                        } else {
-                            log.debug(this + ".doAttachupload ***** Runtime Exception ***** " + e.getMessage());
-                            addAlert(state, rb.getString("failed"));
-                        }
-                    } catch (ServerOverloadException e) {
-                        // disk full or no writing permission to disk
-                        log.debug(this + ".doAttachupload ***** Disk IO Exception ***** " + e.getMessage());
-                        addAlert(state, rb.getString("failed.diskio"));
-                    } catch (Exception ignore) {
-                        // other exceptions should be caught earlier
-                        log.debug(this + ".doAttachupload ***** Unknown Exception ***** " + ignore.getMessage());
-                        addAlert(state, rb.getString("failed"));
-                    } finally {
-                        securityService.popAdvisor(sa);
-                    }
-                }
-            } catch (IOException e) {
-                log.debug(this + ".doAttachupload ***** IOException ***** " + e.getMessage());
-                addAlert(state, rb.getString("failed"));
+	            try {
+	                //check the InputStreamReader to see if the file is 0kb aka empty
+	                if (!reader.ready()) {
+	                    addAlert(state, rb.getFormattedMessage("attempty", filename));
+	                } else {
+	                    // we just want the file name part - strip off any drive and path stuff
+	                    String name = Validator.getFileName(filename);
+	                    String resourceId = Validator.escapeResourceName(name);
+	
+	                    // make a set of properties to add for the new resource
+	                    ResourcePropertiesEdit props = contentHostingService.newResourceProperties();
+	                    props.addProperty(ResourceProperties.PROP_DISPLAY_NAME, name);
+	                    props.addProperty(ResourceProperties.PROP_DESCRIPTION, filename);
+	
+	                    // make an attachment resource for this URL
+	                    SecurityAdvisor sa = createSubmissionSecurityAdvisor();
+	                    try {
+	                        String siteId = toolManager.getCurrentPlacement().getContext();
+	
+	                        // add attachment
+	                        // put in a security advisor so we can create citationAdmin site without need
+	                        // of further permissions
+	                        securityService.pushAdvisor(sa);
+	                        ContentResource attachment = contentHostingService.addAttachmentResource(resourceId, siteId, "Assignments", contentType, fileContentStream, props);
+	
+	                        Site s = null;
+	                        try {
+	                            s = siteService.getSite(siteId);
+	                        } catch (IdUnusedException iue) {
+	                            log.warn(this + ":doAttachUpload: Site not found!" + iue.getMessage());
+	                        }
+	
+	                        // Check if the file is acceptable with the ContentReviewService
+	                        boolean blockedByCRS = false;
+	                        if (!inPeerReviewMode && assignmentService.allowReviewService(s)) {
+	                            String assignmentReference = (String) state.getAttribute(VIEW_SUBMISSION_ASSIGNMENT_REFERENCE);
+	                            Assignment a = getAssignment(assignmentReference, "doAttachUpload", state);
+	                            if (a.getContentReview()) {
+	                                if (!contentReviewService.isAcceptableContent(attachment)) {
+	                                    addAlert(state, rb.getFormattedMessage("review.file.not.accepted", new Object[]{contentReviewService.getServiceName(), getContentReviewAcceptedFileTypesMessage()}));
+	                                    blockedByCRS = true;
+	                                    // TODO: delete the file? Could we have done this check without creating it in the first place?
+	                                }
+	                            }
+	                        }
+	
+	                        if (!blockedByCRS) {
+	                            try {
+	                                Reference ref = entityManager.newReference(contentHostingService.getReference(attachment.getId()));
+	                                if (singleFileUpload && attachments.size() > 1) {
+	                                    //SAK-26319	- the assignment type is 'single file upload' and the user has existing attachments, so they must be uploading a 'newSingleUploadedFile'	--bbailla2
+	                                    state.setAttribute("newSingleUploadedFile", ref);
+	                                } else {
+	                                    attachments.add(ref);
+	                                }
+	                            } catch (Exception ee) {
+	                                log.warn(this + "doAttachUpload cannot find reference for " + attachment.getId() + ee.getMessage());
+	                            }
+	                        }
+	
+	                        if (inPeerReviewMode) {
+	                            state.setAttribute(PEER_ATTACHMENTS, attachments);
+	                        } else {
+	                            state.setAttribute(ATTACHMENTS, attachments);
+	                        }
+	                    } catch (PermissionException e) {
+	                        addAlert(state, rb.getString("notpermis4"));
+	                    } catch (RuntimeException e) {
+	                        if (contentHostingService.ID_LENGTH_EXCEPTION.equals(e.getMessage())) {
+	                            // couldn't we just truncate the resource-id instead of rejecting the upload?
+	                            addAlert(state, rb.getFormattedMessage("alert.toolong", new String[]{name}));
+	                        } else {
+	                            log.debug(this + ".doAttachupload ***** Runtime Exception ***** " + e.getMessage());
+	                            addAlert(state, rb.getString("failed"));
+	                        }
+	                    } catch (ServerOverloadException e) {
+	                        // disk full or no writing permission to disk
+	                        log.debug(this + ".doAttachupload ***** Disk IO Exception ***** " + e.getMessage());
+	                        addAlert(state, rb.getString("failed.diskio"));
+	                    } catch (Exception ignore) {
+	                        // other exceptions should be caught earlier
+	                        log.debug(this + ".doAttachupload ***** Unknown Exception ***** " + ignore.getMessage());
+	                        addAlert(state, rb.getString("failed"));
+	                    } finally {
+	                        securityService.popAdvisor(sa);
+	                    }
+	                }
+	            } catch (IOException e) {
+	                log.debug(this + ".doAttachupload ***** IOException ***** " + e.getMessage());
+	                addAlert(state, rb.getString("failed"));
+	            }
             }
         }
     }    // doAttachupload
@@ -14445,6 +14870,35 @@ public class AssignmentAction extends PagedResourceActionII {
             }
         }
     }
+    
+    /**
+     * NAM-34
+     * Marker Download Statistics
+     */
+    public void doMarkerDownStats(RunData data, Context context) {
+    	doMarkerDownStats(data);
+    } // doMarkerDownStats
+
+    /**
+     * NAM-34
+     * Marker Download Statistics
+     */
+    protected void doMarkerDownStats(RunData data) {
+        SessionState state = ((JetspeedRunData) data).getPortletSessionState(((JetspeedRunData) data).getJs_peid());
+
+        if (!alertGlobalNavigation(state, data)) {
+	        if(assignmentService.allowUserMarkerDownloadAndStats((String) state.getAttribute(STATE_CONTEXT_STRING))) {
+	        	state.setAttribute(STATE_MODE, MODE_MARKER_DOWNLOADS_STATISTICS);
+	        } else {
+	            addAlert(state, rb.getString("youarenot_marker_downloads_statistics"));
+	        }
+
+	        // reset the global navigaion alert flag
+            if (state.getAttribute(ALERT_GLOBAL_NAVIGATION) != null) {
+                state.removeAttribute(ALERT_GLOBAL_NAVIGATION);
+            }
+        }
+    }
 
     /**
      * build the options
@@ -14459,6 +14913,28 @@ public class AssignmentAction extends PagedResourceActionII {
 
     } // build_options_context
 
+    /**
+     * NAM-34
+     * build the marker downloads statistics context
+     */
+    protected String build_marker_downloads_statistics_context(VelocityPortlet portlet, Context context, RunData data, SessionState state) {
+    	context.put("context", state.getAttribute(STATE_CONTEXT_STRING));
+
+    	List<Assignment> assignments = prepPage(state);     
+        for(Assignment assignment: assignments) {
+        	assignmentService.setMarkersForAssignmentByLoggedInUser(assignment);
+        }
+        context.put("assignments", assignments.iterator());
+
+        if (securityService.isSuperUser()) {
+        	context.put("hideMarkerDownloadLinks", Boolean.TRUE);
+        }
+
+        state.setAttribute(STATE_MODE, MODE_MARKER_DOWNLOADS_STATISTICS);
+        String template = (String) getContext(data).get("template");
+        return template + TEMPLATE_MARKER_DOWNLOADS_STATISTICS;
+    }
+    
     /**
      * save the option edits
      *

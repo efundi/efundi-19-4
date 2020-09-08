@@ -16,6 +16,7 @@
 package org.sakaiproject.assignment.impl.persistence;
 
 import java.time.Instant;
+import java.util.Iterator;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +25,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.collections.CollectionUtils;
 import org.hibernate.Criteria;
 import org.hibernate.LockMode;
 import org.hibernate.LockOptions;
@@ -32,11 +34,15 @@ import org.hibernate.Session;
 import org.hibernate.criterion.Projections;
 import org.hibernate.criterion.Restrictions;
 import org.sakaiproject.assignment.api.model.Assignment;
+import org.sakaiproject.assignment.api.model.AssignmentMarker;
+import org.sakaiproject.assignment.api.model.AssignmentMarkerHistory;
 import org.sakaiproject.assignment.api.model.AssignmentSubmission;
+import org.sakaiproject.assignment.api.model.AssignmentSubmissionMarker;
 import org.sakaiproject.assignment.api.model.AssignmentSubmissionSubmitter;
 import org.sakaiproject.assignment.api.persistence.AssignmentRepository;
 import org.sakaiproject.hibernate.HibernateCriterionUtils;
 import org.sakaiproject.serialization.BasicSerializableRepository;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import lombok.extern.slf4j.Slf4j;
@@ -119,6 +125,28 @@ public class AssignmentRepositoryImpl extends BasicSerializableRepository<Assign
             session.update(assignment);
             session.flush();
         }
+    }
+    
+    @Override
+    @Transactional
+    public void deleteAssignmentMarker(AssignmentMarker marker) {
+	    	Session session = sessionFactory.getCurrentSession();
+	    	Assignment assignment = marker.getAssignment();
+	    	session.refresh(assignment);
+	    	assignment.getMarkers().remove(marker);
+	    	session.update(assignment);
+	        session.flush();
+    }
+
+    @Override
+    @Transactional
+    public void deleteAssignmentSubmissionMarker(AssignmentSubmissionMarker submissionMarker) {
+	    	Session session = sessionFactory.getCurrentSession();
+	    	AssignmentMarker assignmentMarker = submissionMarker.getAssignmentMarker();
+	    	session.refresh(assignmentMarker);
+	    	assignmentMarker.getSubmissionMarkers().remove(submissionMarker);
+	    	session.update(assignmentMarker);
+	        session.flush();
     }
 
     @Override
@@ -282,4 +310,108 @@ public class AssignmentRepositoryImpl extends BasicSerializableRepository<Assign
             sessionFactory.getCache().evictEntity(Assignment.class, assignment.getId());
         }
     }
+    
+    @Override
+	@Transactional(propagation = Propagation.REQUIRES_NEW)
+	public void createAssignmentMarker(AssignmentMarker assignmentMarker) {
+		Session session = sessionFactory.getCurrentSession();
+		assignmentMarker.setDateCreated(Instant.now());
+		session.persist(assignmentMarker);
+	}
+
+	@Override
+	@Transactional(propagation = Propagation.REQUIRES_NEW)
+	public void updateAssignmentMarker(AssignmentMarker assignmentMarker) {
+		Session session = sessionFactory.getCurrentSession();
+		assignmentMarker.setDateModified(Instant.now());
+		try {
+		session.update(assignmentMarker);
+		}
+		catch(Exception e) {
+			session.merge(assignmentMarker);	
+		}
+		session.flush();
+	}
+
+	@Override
+	public AssignmentMarker findAssignmentMarker(String id) {
+		Session session = sessionFactory.getCurrentSession();
+		return (AssignmentMarker) session.get(AssignmentMarker.class, id);
+	}
+
+	@Override
+	@SuppressWarnings("unchecked")
+	public List<AssignmentMarker> findMarkersForAssignmentById(String assignmentId) {
+		Criteria criteria = sessionFactory.getCurrentSession().createCriteria(AssignmentMarker.class);
+		return criteria.add(Restrictions.eq("assignment.id", assignmentId)).list();
+	}
+
+	/**
+	 * NAM-35
+	 *
+	 * Transactional method for logging assignmentMarkerHistory. Create new object
+	 * of AssignmentMarkerHistory Assign variables Use
+	 * sessionFactory.getCurrentSession().persist(obj);
+	 */
+	@Override
+	@Transactional(propagation = Propagation.REQUIRES_NEW)
+	public void createAssignmentMarkerHistory(AssignmentMarkerHistory assignmentMarkerHistory) {
+		Session session = sessionFactory.getCurrentSession();
+		assignmentMarkerHistory.setDateModified(Instant.now());
+		session.persist(assignmentMarkerHistory);
+	}
+
+	@Override
+	@Transactional(propagation = Propagation.REQUIRES_NEW)
+	public void createAssignmentSubmissionMarker(AssignmentSubmissionMarker assignmentSubmissionMarker) {
+		Session session = sessionFactory.getCurrentSession();
+		assignmentSubmissionMarker.setDateCreated(Instant.now());
+		session.persist(assignmentSubmissionMarker);
+	}
+
+	@Override
+	@Transactional(propagation = Propagation.REQUIRES_NEW)
+	public void updateAssignmentSubmissionMarker(AssignmentSubmissionMarker assignmentSubmissionMarker) {
+		Session session = sessionFactory.getCurrentSession();
+		assignmentSubmissionMarker.setDateModified(Instant.now());
+		session.update(assignmentSubmissionMarker);
+		session.flush();
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public List<AssignmentSubmissionMarker> findSubmissionMarkersByIdAndAssignmentId(String assignmentId, String markerId) {
+		Criteria criteria = sessionFactory.getCurrentSession().createCriteria(AssignmentSubmissionMarker.class);
+		criteria.createAlias("assignmentMarker", "asn");
+		return criteria.add(Restrictions.eq("context", assignmentId))
+				.add(Restrictions.eq("asn.markerUserId", markerId)).list();
+	}
+
+	@Override
+	public AssignmentSubmissionMarker findSubmissionMarkerForMarkerIdAndSubmissionId(String markerId, String submissionId) {
+		Criteria criteria = sessionFactory.getCurrentSession().createCriteria(AssignmentSubmissionMarker.class);
+		criteria.createAlias("assignmentMarker", "asn");
+		return (AssignmentSubmissionMarker) criteria.add(Restrictions.eq("asn.markerUserId", markerId))
+				.add(Restrictions.eq("assignmentSubmission.id", submissionId)).uniqueResult();
+	}
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public List<Assignment> findAllAssignmentsForMarkerQuotaCalculation() {
+        return startCriteriaQuery()
+                .add(Restrictions.eq("isMarker", Boolean.TRUE))
+                .add(Restrictions.lt("openDate", Instant.now()))
+                .add(Restrictions.eq("deleted", Boolean.FALSE))
+                .list();
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public List<AssignmentSubmissionMarker> findAssignmentMarkerUnmarkedSubmissions(String assignmentId, String markerId) {
+    	Criteria criteria = sessionFactory.getCurrentSession().createCriteria(AssignmentSubmissionMarker.class);
+		criteria.createAlias("assignmentMarker", "asn");
+		return criteria.add(Restrictions.eq("context", assignmentId))
+				.add(Restrictions.eq("asn.markerUserId", markerId))
+				.add(Restrictions.eq("uploaded", Boolean.FALSE)).list();
+	}
 }

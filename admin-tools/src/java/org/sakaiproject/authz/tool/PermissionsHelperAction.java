@@ -38,6 +38,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import lombok.extern.slf4j.Slf4j;
 
+import org.sakaiproject.assignment.api.AssignmentService;
 import org.sakaiproject.authz.api.AuthzGroup;
 import org.sakaiproject.authz.api.AuthzPermissionException;
 import org.sakaiproject.authz.api.GroupAlreadyDefinedException;
@@ -709,6 +710,32 @@ public class PermissionsHelperAction extends VelocityPortletPaneledAction
 				}
 				else
 				{
+					// NAM-23 - start
+					try {
+						String assignmentContext = (String) state.getAttribute("Assignment.context_string");
+						String roleID = role.getId();
+						if (assignmentContext != null) {
+							if (serverConfigurationService.getBoolean("assignment.useMarker ", false)) {
+								if (lock.equals("asn.marker")) {
+									AssignmentService assignmentService = ComponentManager.get(AssignmentService.class);
+									Boolean allowRemove = assignmentService.allowRemoveUserWithRoleIfMarkingUsed(assignmentContext,
+											roleID);
+									if (!allowRemove) {
+										log.warn(
+												"PermissionsAction.RemovePermission: Marker has marking assigned, cannot remove permission for role "
+														+ roleID,
+												roleID, "Excpetion");
+										addAlert(state, rb.getFormattedMessage("alert_marker"));
+										return;
+									}
+								}
+							}
+						}
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
+					// NAM-23 - end
+					
 					// if we do have this role, make sure there's not this lock
 					Role myRole = edit.getRole(role.getId());
 					if (myRole != null)

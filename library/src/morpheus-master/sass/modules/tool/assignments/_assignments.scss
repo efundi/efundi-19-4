@@ -505,4 +505,60 @@
   #submissionList sakai-rubric-student-button {
     float: right;
   }
+	
+	//quota reassign dropdown
+	.select-quota {
+	    width: 200px;
+	    text-overflow: ellipsis;
+	}
+
+	//quota value input field
+	.input-quota {
+	    width: 50px;
+	}
+
+	//quota table formatting
+	.table-quota {
+	  width: 50%;
+	  max-width: 100%;
+	  margin-bottom: $line-height-computed;
+	  // Cells
+	  > thead,
+	  > tbody,
+	  > tfoot {
+	    > tr {
+	      > th,
+	      > td {
+	        padding: $table-cell-padding;
+	        line-height: $line-height-base;
+	        vertical-align: top;
+	        border-top: 1px solid $table-border-color;
+	      }
+	    }
+	  }
+	}
+
+	.fileContainer {
+	    overflow: hidden;
+	    position: relative;
+	    border: 2px dashed #008CBA;
+	    width: 100%;
+	    height: 100px;
+	    border-radius: 8px;
+	    text-align: center;
+	}
+
+	.fileContainer [type=file] {
+	    cursor: inherit;
+	    display: block;
+	    font-size: 999px;
+	    filter: alpha(opacity=0);
+	    min-height: 100%;
+	    min-width: 100%;
+	    opacity: 0;
+	    position: absolute;
+	    right: 0;
+	    text-align: right;
+	    top: 0;
+	}
 }

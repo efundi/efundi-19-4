@@ -1,5 +1,16 @@
 // 'Namespace'
 var ASN = ASN || {};
+var decimalError;
+var totalError;
+var totalLessThanError;
+
+ASN.showFileName = function() {
+	var input = document.getElementById('file');
+	var infoArea = document.getElementById('file-upload-filename');
+	var fileName = input.files[0].name;
+
+	infoArea.textContent = 'File name: ' + fileName;
+}
 
 // http://stackoverflow.com/a/6021027/3708872
 ASN.updateQueryStringParameter = function(uri, key, value) {
@@ -11,7 +22,119 @@ ASN.updateQueryStringParameter = function(uri, key, value) {
   else {
     return uri + separator + key + "=" + value;
   }
+};
+
+ASN.saveErrors = function(error, error2, error3) {
+	decimalError = error2;
+	totalError = error;
+	totalLessThanError = error3;
+};
+
+ASN.displayError = function(value, error) {
+	document.getElementById(value).title=error;
+	document.getElementById(value).alt=error;
+	document.getElementById(value).style.backgroundColor="red";
+};
+
+ASN.hideError = function(value) {
+	document.getElementById(value).title="";
+	document.getElementById(value).alt="";
+	document.getElementById(value).style.backgroundColor="white";
+};
+
+ASN.quotaCalculation = function(value_totalMarkers)
+{
+	var sum = 0;
+	var value;
+	var quotaId;
+
+
+	ASN.enableButtons();
+
+	if (document.getElementById("allowMarkerToggle").checked) {
+		for (var i = 1; i <= value_totalMarkers; i++) {
+			quotaId = "quota" + i;
+			value = document.getElementById(quotaId).value;
+			ASN.hideError(quotaId);
+			if (ASN.countDecimals(Number(value)) > 1) {
+				ASN.displayError(quotaId, decimalError);
+				ASN.disableButtons();
+			}
+			sum = Number(value) + Number(sum);
+			if (Number(sum) > 100) {
+				ASN.displayError(quotaId, totalError);
+				ASN.disableButtons();
+			}
+		}
+
+		if (Number(sum) < 100) {
+			ASN.displayError(quotaId, totalLessThanError);
+			ASN.disableButtons();
+		}
+	}
+};
+
+ASN.removeDisableOption = function() {
+	if (document.getElementById("allowMarkerToggle") !== null) {
+		if (document.getElementById("allowMarkerToggle").checked) {
+			document.getElementById("allowMarkerToggle").disabled = false;
+			document.getElementById("subType").disabled = false;
+		}
+	}
 }
+
+ASN.enableUploadOptions = function(value_isMarker) {
+	if (value_isMarker != null) {
+		document.getElementById("studentSubmissionText").disabled = false;
+		document.getElementById("studentSubmissionAttachment").disabled = false;
+		document.getElementById("gradeFile").disabled = false;
+		document.getElementById("feedbackTexts").disabled = false;
+		document.getElementById("feedbackComments").disabled = false;
+		document.getElementById("feedbackAttachments").disabled = false;
+	}
+}
+
+ASN.enableMarkingTool = function() {
+	if (document.getElementById("allowMarkerToggle").checked) {
+		document.getElementById('pdfMarkerSettings').style.display = 'block';
+		document.getElementById('new_assignment_group_submit').checked = false;
+		document.getElementById('new_assignment_group_submit').disabled  = true;
+		document.getElementById('new_assignment_use_peer_assessment').checked = false;
+		document.getElementById('new_assignment_use_peer_assessment').disabled  = true;
+		document.getElementById('$name_noAdditionalOptionsName').checked = true;
+		ASN.toggleAddOptions('none');
+	} else {
+		document.getElementById('pdfMarkerSettings').style.display = 'none';
+		document.getElementById('$name_noAdditionalOptionsName').checked = true;
+		document.getElementById('new_assignment_group_submit').disabled  = false;
+		document.getElementById('new_assignment_use_peer_assessment').disabled  = false;
+		ASN.enableButtons();
+	}
+};
+
+ASN.countDecimals = function(value) {
+    if (Math.floor(value) !== value)
+        return value.toString().split(".")[1].length || 0;
+    return 0;
+};
+
+ASN.disableButtons = function()
+{
+	document.getElementsByName("post")[0].disabled = true;
+	document.getElementsByName("preview")[0].disabled = true;
+	if (document.getElementsByName("save").length > 0) {
+		document.getElementsByName("save")[0].disabled = true;
+	}
+};
+
+ASN.enableButtons = function()
+{
+	document.getElementsByName("post")[0].disabled = false;
+	document.getElementsByName("preview")[0].disabled = false;
+	if (document.getElementsByName("save").length > 0) {
+		document.getElementsByName("save")[0].disabled = false;
+	}
+};
 
 ASN.getSelect = function(selectBox) {
     if (selectBox && selectBox instanceof HTMLSelectElement) { 
@@ -768,6 +891,18 @@ ASN.invokeDownloadUrl = function(accessPointUrl, actionString, alertMessage, par
     {
         extraInfoArray[extraInfoArray.length]="includeNotSubmitted=true";
     }
+    if (document.getElementById('isMarker') && document.getElementById('isMarker').value)
+    {
+		extraInfoArray[extraInfoArray.length] = ('isMarker=true');
+    }
+    if (document.getElementById('markerDownloadPartial'))
+    {
+		extraInfoArray[extraInfoArray.length] = ('markerDownloadPartial='+document.getElementById('markerDownloadPartial').value);
+    }    
+    if (document.getElementById('markerDownloadAll'))
+    {
+		extraInfoArray[extraInfoArray.length] = ('markerDownloadAll='+document.getElementById('markerDownloadAll').value);
+    }
     if (extraInfoArray.length === 0)
     {
         alert(alertMessage);
@@ -825,6 +960,7 @@ ASN.submitForm = function( formID, option, submissionID, view, focusId )
 {
     // Get the form
     var form = document.getElementById( formID );
+    ASN.removeDisableOption();
     if( form !== null )
     {
         // Apply the submission ID to the form's action if one is supplied
@@ -846,7 +982,12 @@ ASN.submitForm = function( formID, option, submissionID, view, focusId )
         // If an option was given, apply it to the element
         if( option !== null )
         {
-            var optionElement = document.getElementById( "option" );
+        	var optionElement;
+        	if (option === "markerPartialDownload" || option === "markerDownload" || option === "markerUpload") {
+        		optionElement = form.elements.namedItem("option");
+        	} else {
+        		optionElement = document.getElementById( "option" );
+        	}
             if( optionElement !== null )
             {
                 optionElement.value = option;

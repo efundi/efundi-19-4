@@ -203,7 +203,7 @@
         <dependency>
             <groupId>coza.opencollab</groupId>
             <artifactId>epub-creator</artifactId>
-            <version>1.0.1-SNAPSHOT</version>
+            <version>1.0.1</version>
         </dependency>
         <dependency>
             <groupId>org.jsoup</groupId>

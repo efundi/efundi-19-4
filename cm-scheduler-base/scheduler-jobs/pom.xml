@@ -22,12 +22,7 @@
 			<groupId>quartz</groupId>
 			<artifactId>quartz</artifactId>
 			<version>1.5.1</version>
-		</dependency>
-		<dependency>
-			<groupId>axis</groupId>
-			<artifactId>axis</artifactId>
-			<version>1.4</version>
-		</dependency>   	
+		</dependency>  	
 		<dependency>
 			<groupId>commons-logging</groupId>
 			<artifactId>commons-logging</artifactId>
@@ -50,6 +45,11 @@
 		<dependency>
 		    <groupId>org.apache.commons</groupId>
 		    <artifactId>commons-collections4</artifactId>
+		</dependency>
+		<dependency>
+		  <groupId>za.ac.nwu.pontoon</groupId>	
+		  <artifactId>student-vss-api</artifactId>
+		  <version>8.0.0</version>
 		</dependency>
 	</dependencies>
 

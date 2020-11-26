@@ -9,7 +9,7 @@
 		<spring.version>5.0.3.RELEASE</spring.version>
 		<spring.security.version>3.2.5.RELEASE</spring.security.version>
 		<cxf.version>3.1.6</cxf.version>
-		<cas.client.version>3.5.1-SNAPSHOT</cas.client.version>
+		<cas.client.version>3.5.1</cas.client.version>
 		<servlet-api.version>2.4</servlet-api.version>
 		<jackson.version>2.9.7</jackson.version>
 	</properties>		
@@ -60,6 +60,11 @@
 		    <groupId>org.springframework.security</groupId>
 		    <artifactId>spring-security-ldap</artifactId>
 			<version>${spring.security.version}</version>
+		</dependency>
+		<dependency>
+		    <groupId>joda-time</groupId>
+		    <artifactId>joda-time</artifactId>
+		    <version>2.10.5</version>
 		</dependency>
 		
 		<dependency>
@@ -164,10 +169,20 @@
 			<scope>test</scope>
 		</dependency>
 		<dependency>
-			<groupId>axis</groupId>
-			<artifactId>axis</artifactId>
-			<version>1.4</version>
-		</dependency>   		
+			<groupId>za.ac.nwu.registry</groupId>
+			<artifactId>wsregistry-api-client</artifactId>
+			<version>4.0.0</version> 
+		</dependency>
+		<dependency>
+			<groupId>nwu.core.capabilities</groupId>
+			<artifactId>curriculum-delivery-api</artifactId>
+			<version>3.0.0</version>
+		</dependency>
+		<dependency>
+		  <groupId>za.ac.nwu.pontoon</groupId>	
+		  <artifactId>student-vss-api</artifactId>
+		  <version>8.0.0</version>
+		</dependency>
 	</dependencies>
 	
 	  <build>

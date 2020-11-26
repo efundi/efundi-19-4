@@ -1,17 +1,14 @@
 package edu.nwu.sakaistudentlink.services;
 
 import java.io.InputStream;
-import java.net.URL;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Calendar;
 import java.util.List;
-import java.util.Map;
 
 import javax.ws.rs.core.Response;
-import javax.xml.ws.BindingProvider;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.cxf.helpers.IOUtils;
@@ -20,10 +17,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
-import za.ac.nwu.wsdl.studentacademicregistration.AcademicPeriodInfo;
-import za.ac.nwu.wsdl.studentacademicregistration.ModuleOfferingSearchCriteriaInfo;
-import za.ac.nwu.wsdl.studentacademicregistration.StudentAcademicRegistrationService;
-import za.ac.nwu.wsdl.studentacademicregistration.StudentAcademicRegistrationService_Service;
+import ac.za.nwu.academic.dates.dto.AcademicPeriodInfo;
+import ac.za.nwu.academic.registration.service.StudentAcademicRegistrationService;
+import ac.za.nwu.moduleoffering.dto.ModuleOfferingSearchCriteriaInfo;
+import ac.za.nwu.registry.utility.GenericServiceClientFactory;
+import assemble.edu.common.dto.ContextInfo;
 
 
 /**
@@ -148,9 +146,10 @@ public class CourseManagementWSHandler {
         
         ModuleOfferingSearchCriteriaInfo searchCriteria = new ModuleOfferingSearchCriteriaInfo();
 
-        AcademicPeriodInfo academicPeriodInfo = new AcademicPeriodInfo();
-        academicPeriodInfo.setAcadPeriodtTypeKey("vss.code.AcademicPeriod.Year");
-        academicPeriodInfo.setAcadPeriodValue(Integer.toString(calendar.get(Calendar.YEAR)));
+		AcademicPeriodInfo academicPeriodInfo = new AcademicPeriodInfo();
+		academicPeriodInfo.setAcadPeriodtTypeKey("vss.code.AcademicPeriod.YEAR");
+		academicPeriodInfo.setAcadPeriodValue(Integer.toString(calendar.get(Calendar.YEAR)));
+		ContextInfo contextInfo = new ContextInfo("SOAPUI");
         
         searchCriteria.setAcademicPeriod(academicPeriodInfo);
         searchCriteria.setModuleSubjectCode(moduleDetail.getModuleSubjectCode().toUpperCase());
@@ -160,17 +159,13 @@ public class CourseManagementWSHandler {
         searchCriteria.setModeOfDeliveryTypeKey(moduleDetail.getModeOfDeliveryCodeParam());
 
 		try {
-			URL wsdlURL = new URL(settingsProperties
-	                .getProperty("ws.student.url", "http://workflowprd.nwu.ac.za/sapi-vss-v5/StudentAcademicRegistrationService/StudentAcademicRegistrationService?wsdl"));
-	        StudentAcademicRegistrationService_Service service = new StudentAcademicRegistrationService_Service(wsdlURL);
-	        StudentAcademicRegistrationService port = service.getStudentAcademicRegistrationServicePort();        
-
-			((BindingProvider) port).getRequestContext().put(BindingProvider.USERNAME_PROPERTY, settingsProperties
-	                .getProperty("nwu.context.info.username", "sapiappreadprod"));
-			((BindingProvider) port).getRequestContext().put(BindingProvider.PASSWORD_PROPERTY, settingsProperties
-	                .getProperty("nwu.context.info.password", "5p@ssw0rd4pr0dr"));
-
-			List<String> studentUserNames = port.getStudentAcademicRegistrationByModuleOffering(searchCriteria, null);
+			String envTypeKey = settingsProperties.getProperty("ws.student.env.type.key", "/PROD/SAPI-STUDENTACADEMICREGISTRATIONSERVICE/V8");
+			String contextInfoUsername = settingsProperties.getProperty("nwu.context.info.username", "sapiappreadprod");
+			String contextInfoPassword = settingsProperties.getProperty("nwu.context.info.password", "5p@ssw0rd4pr0dr");
+			
+			StudentAcademicRegistrationService service = (StudentAcademicRegistrationService) GenericServiceClientFactory
+					.getService(envTypeKey, contextInfoUsername, contextInfoPassword, StudentAcademicRegistrationService.class);
+			List<String> studentUserNames = service.getStudentAcademicRegistrationByModuleOffering(searchCriteria, contextInfo);			
 	        
 	        for (int j = 0; j < studentUserNames.size(); j++) {
 	        	String studentUserName = studentUserNames.get(j);

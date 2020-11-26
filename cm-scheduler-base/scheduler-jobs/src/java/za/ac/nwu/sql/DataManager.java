@@ -580,10 +580,10 @@ public class DataManager {
 			InvalidParameterException, MissingParameterException, OperationFailedException, PermissionDeniedException {
 		ServerConfigurationService serverConfigurationService = connectionManager.getServerConfigurationService();
 
-		Calendar calendar = Calendar.getInstance();
-		String envTypeKey = serverConfigurationService.getString("ws.env.type.key", "/TEST/SAPI-STUDENTACADEMICREGISTRATIONSERVICE/V8/V_TEST");
-		String contextInfoUsername = serverConfigurationService.getString("nwu.context.info.username", "sapiappreadtest");
-		String contextInfoPassword = serverConfigurationService.getString("nwu.context.info.password", "sp@ssw0rd");
+		Calendar calendar = Calendar.getInstance();		
+		String envTypeKey = serverConfigurationService.getString("ws.env.type.key", "/PROD/SAPI-STUDENTACADEMICREGISTRATIONSERVICE/V8");
+		String contextInfoUsername = serverConfigurationService.getString("nwu.context.info.username", "sapiappreadprod");
+		String contextInfoPassword = serverConfigurationService.getString("nwu.context.info.password", "5p@ssw0rd4pr0dr");
 
 		AcademicPeriodInfo academicPeriodInfo = new AcademicPeriodInfo();
 		academicPeriodInfo.setAcadPeriodtTypeKey("vss.code.AcademicPeriod.YEAR");

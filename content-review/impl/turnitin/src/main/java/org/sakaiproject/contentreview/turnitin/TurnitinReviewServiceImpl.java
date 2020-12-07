@@ -2172,7 +2172,7 @@ public class TurnitinReviewServiceImpl extends BaseContentReviewService {
 				}
 			}
 		}
-		return TurnitinAPIUtil.removeDiacritics(uln);
+		return TurnitinAPIUtil.removeDiacritics(ufn);
 	}
 
 	/**

@@ -1,6 +1,17 @@
 
-#eFundi changes 2020
-Course Management: 
+# eFundi changes 2020
+COURSEMANAGEMENT: 
+1 cm-scheduler base (add webservices)
+2 cm-provider
+3 kernel
+4 providers
+
+SLINK
+1 sakai.properties Webservices change
+2 settings.properties Webservices change
+
+
+
 
 # Sakai Collaboration and Learning Environment (Sakai CLE)
 

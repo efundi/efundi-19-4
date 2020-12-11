@@ -40,6 +40,7 @@
 		 		});
 		 	});
 		#end
+		ASN.saveErrors("$tlang.getString('quota.assignment.table.input.error')", "$tlang.getString('quota.assignment.table.input.error2')", "$tlang.getString('quota.assignment.table.input.error4')");
 		window.onload = function() {
 			SetMaxPoint(document.getElementById('$name_GradeType'), document.getElementById('$name_GradePoints'));
 			if( $('#new_assignment_group_submit').is(':checked') ) {
@@ -83,6 +84,8 @@
 	## handles the Student Submissions dropdown
 	function switchAssignmentSubmissionType()
 	{
+		ASN.enableButtons();
+		var useTool = document.getElementById('allowMarkerToggle');
 		var useReview = document.getElementById('$name_UseReviewService');
 		var lblUseReview=document.getElementById('lblReviewService');
 		var reviewSwitchNe1 = document.getElementById('review.switch.ne.1');
@@ -104,6 +107,20 @@
 				document.getElementById('resubmitNotification').style.display = 'block';
 				ASN.resizeFrame();
 			}
+			if (document.getElementById('subType').value == 6) 
+			{
+				document.getElementById('allowPdfMarker').style.display = 'block';
+
+				if (document.getElementById('allowMarkerToggle').checked)
+				{
+					document.getElementById('pdfMarkerSettings').style.display = 'block';
+					ASN.resizeFrame();
+				}
+			} else {
+				document.getElementById('allowPdfMarker').style.display = 'none';
+				document.getElementById('pdfMarkerSettings').style.display = 'none';
+				useTool.checked=false;
+			}
 		}
 		else
 		{
@@ -119,14 +136,29 @@
 				reviewSwitchNe1.style.removeProperty('display');
 				lblUseReview.style.display = 'none';
 			#end
+			useTool.checked=false;
 			document.getElementById('tempAllowRes').parentNode.parentNode.style.display = 'none';
 			document.getElementById('allowResubmitNumber').style.display = 'none';
 			document.getElementById('allowResubmitTime').style.display = 'none';
 			document.getElementById('resubmitNotification').style.display = 'none';
+			document.getElementById('pdfMarkerSettings').style.display = 'none';
+			document.getElementById('allowPdfMarker').style.display = 'none';
 		}
 	}
 	focus_path = [ '$fField' ];
 </script>
+<style>
+	/* For Firefox */
+	input[type='number'] {
+	    -moz-appearance:textfield;
+	}
+	/* Webkit browsers like Safari and Chrome */
+	input[type=number]::-webkit-inner-spin-button,
+	input[type=number]::-webkit-outer-spin-button {
+	    -webkit-appearance: none;
+	    margin: 0;
+	}
+</style>
 #javascript("/library/js/lang-datepicker/lang-datepicker.js")
 
 <div class="portletBody container-fluid">
@@ -609,7 +641,7 @@
 				$tlang.getString("gen.submissionType")
 			</label>
 			<div class="col-sm-6">
-				<select name="$name_SubmissionType" id="subType" onchange="switchAssignmentSubmissionType();" class="assignment-submission-type">
+				<select name="$name_SubmissionType" id="subType" onchange="ASN.enableMarkingTool(); switchAssignmentSubmissionType();" class="assignment-submission-type">
 				#foreach ($i in [1..$!value_totalSubmissionTypes])
 					#if ($i == $value_SubmissionType)
 						<option value="$i" selected="selected">$submissionTypeTable.get($i)</option>
@@ -698,6 +730,58 @@
 					<input type="radio" name="$!name_assignment_releasereturn_notification" id="sendreleasereturnnotif" value="$!value_assignment_releasereturn_notification_each" #if($!value_assignment_releasereturn_notification.equals($!value_assignment_releasereturn_notification_each))checked="checked" #end />
 					$tlang.getString('send.submission.releasereturn.email')
 				</label>
+			</div>
+		</div>
+
+		##NAM-29 PDF marker settings checkbox
+		<div class="form-group row" id="allowPdfMarker" #if($value_SubmissionType != 6) style="display:none" #else style="display:block"#end>
+			<label class="col-sm-2 control-label" for="allowMarkToggle">
+				$tlang.getString("allowMarkingTool")
+			</label>
+			<div class="col-sm-10">
+				<div id="tempAllowMarker" #if ($value_SubmissionType == 4) style = "display:none"#end>
+					<input type="checkbox" id="allowMarkerToggle" name ="allowMarkerToggle" onclick="ASN.enableMarkingTool(); ASN.quotaCalculation($assignmentMarkers.size()); ASN.resizeFrame();" #if($!markerEnabled) checked="checked" class="disabled" disabled="disabled"#end/>
+				</div>
+			</div>
+		</div>
+
+		##NAM-29 PDF marker settings that will be displayed when the tool is selected
+		<div class="col-sm-offset-1 row" id="pdfMarkerSettings" #if($!markerEnabled) style="display:block"#else style="display:none"#end>
+			<div class="col-sm-12 row table-reponsive">
+				<table class="table-striped table-quota" id="quotaAssignmentTable" name="quotaAssignmentTable">
+					<tr>
+						<th>$tlang.getString("quota.assignment.table.column.name")</th>
+						<th>$tlang.getString("quota.assignment.table.column.quota")</th>
+						#if($!assignment)
+							<th>$tlang.getString("quota.assignment.table.column.reassign")</th>
+						#end
+					</tr>
+					#foreach ($assignmentMarker in $assignmentMarkers)
+
+						#if($assignmentMarker.markerUserId) <input type="hidden" name="assignmentMarkerUserId$velocityCount" value="$assignmentMarker.markerUserId" /> #end
+
+						<tr>	
+							<td>
+								$assignmentMarker.userDisplayName
+							</td>
+							<td>
+								<input type="number" value="$assignmentMarker.quotaPercentage" class="input-quota" step="0.1" placeholder="0.0" name="quota$velocityCount" id="quota$velocityCount" onchange="ASN.quotaCalculation($assignmentMarkers.size())" #if($!markerEnabled) disabled="disabled" #end>
+							</td>
+							#if($!assignment)
+								<td>
+									<select class="select-quota" name="reassignSelect$velocityCount" id="reassignSelect$velocityCount" #if(!$!markerEnabled || $value_SubmissionType != 6)disabled#end>
+										<option  value="">$tlang.getString("marker.reassign.select")</option>
+										#foreach ($assignmentMarkerReassign in $assignmentMarkers)
+											#if("$assignmentMarker.markerUserId" != "$assignmentMarkerReassign.markerUserId")
+												<option value="$assignmentMarkerReassign.markerUserId">$assignmentMarkerReassign.userDisplayName</option>
+											#end	
+										#end
+									</select>
+								</td>
+							#end
+						</tr>
+					#end
+				</table>
 			</div>
 		</div>
 

@@ -116,6 +116,8 @@ $(document).ready(function(){
 					 $tlang.getString("stuviewsubm.asshasnot")
 				#elseif (($submissionType==2) || ($submissionType==5))
 				 	$tlang.getString("stuviewsubm.assattonly")
+				#elseif ($submissionType==6)
+					$tlang.getString("stuviewsubm.pdfonly") ##NAM-26
 				#end
 				#if($assignment.AllowPeerAssessment)
 					<div class="highlight">
@@ -673,7 +675,7 @@ $(document).ready(function(){
 						#end
 					</p>
 				#end	
-				#if (($submissionType == 2) || ($submissionType == 5))
+				#if (($submissionType == 2) || ($submissionType == 5) || ($submissionType == 6))
 					#if ($plagiarismNote)
 						<p>
 							<img alt="$reviewIndicator" title="$reviewIndicator" src="/library/image/silk/rosette.png" class="assignmentRosette"/>
@@ -699,7 +701,7 @@ $(document).ready(function(){
 					#end
 				#end
 			#end
-			#if (($submissionType==2) || ($submissionType==3) || ($submissionType==5 && $size < 2))
+			#if (($submissionType==2) || ($submissionType==3) || ($submissionType==5 && $size < 2) || $submissionType==6 ) ##NAM-27
 				<div id="attachmentspanel" class="highlightPanel" style="background:#ffe">
 					<h3 style="margin-top:0;margin-bottom:.5em">
 						#if ($submissionType == 5)
@@ -794,7 +796,7 @@ $(document).ready(function(){
 						</div>
 					#end
 					## for single file upload case
-					#if ($submissionType==5 && $attachments && $attachments.size() == 0)
+					#if (($submissionType==5 || $submissionType==6) && $attachments && $attachments.size() == 0) ##NAM-26 (8)
 						<div class="highlightPanel">
 							<table border="0" cellpadding="0" cellspacing="0" class="listHier centerLines" style="width:auto;margin:0;">
 								<tbody>
@@ -804,7 +806,12 @@ $(document).ready(function(){
 										</td>
 										<td>
 											<div class="spinnerBesideContainer">
-												<input type="file" name="upload" class="upload" id="clonableUpload" #if($content_review_acceptedMimeTypes) accept="$content_review_acceptedMimeTypes" #end onchange="SPNR.insertSpinnerAfter( this, null, null ); document.getElementById('addSubmissionForm').action='#toolLinkParam("AssignmentAction" "doAttachUploadSingle" "sakai_csrf_token=$validator.escapeUrl($sakai_csrf_token)")';ASN.submitForm( 'addSubmissionForm', null, null, null, 'attachmentspanel' );"/>
+												##NAM-27
+												#if ($submissionType == 6)
+													<input type="file" name="upload" class="upload" id="clonableUpload" #if($content_review_acceptedMimeTypes) accept="$content_review_acceptedMimeTypes" #end onchange="SPNR.insertSpinnerAfter( this, null, null ); document.getElementById('addSubmissionForm').action='#toolLinkParam("AssignmentAction" "doAttachUploadSinglePDF" "sakai_csrf_token=$validator.escapeUrl($sakai_csrf_token)")';ASN.submitForm( 'addSubmissionForm', null, null, null, 'attachmentspanel' );"/>
+												#else												
+													<input type="file" name="upload" class="upload" id="clonableUpload" #if($content_review_acceptedMimeTypes) accept="$content_review_acceptedMimeTypes" #end onchange="SPNR.insertSpinnerAfter( this, null, null ); document.getElementById('addSubmissionForm').action='#toolLinkParam("AssignmentAction" "doAttachUploadSingle" "sakai_csrf_token=$validator.escapeUrl($sakai_csrf_token)")';ASN.submitForm( 'addSubmissionForm', null, null, null, 'attachmentspanel' );"/>
+												#end
 											</div>
 											<input type="hidden" name="submissionFileCount" id="submissionFileCount" value="1"/>
 										</td>

@@ -114,7 +114,8 @@ public final class AssignmentServiceConstants {
     public static final String NEW_ASSIGNMENT_CHECK_ANONYMOUS_GRADING = "new_assignment_check_anonymous_grading";
     // SAK-33971 Property for enable/disable the group filter
     public static final String PROP_ASSIGNMENT_GROUP_FILTER_ENABLED = "assignment.group.filter.enabled";
-
+	//NAM-24 Marker Permission
+    public static final String SECURE_ASSIGNMENT_MARKER = "asn.marker";
     public static final Set<String> PROPERTIES_EXCLUDED_FROM_DUPLICATE_ASSIGNMENTS =
             Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
                     AssignmentConstants.NEW_ASSIGNMENT_DUE_DATE_SCHEDULED,

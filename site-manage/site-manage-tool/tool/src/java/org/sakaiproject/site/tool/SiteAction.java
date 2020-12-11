@@ -70,6 +70,7 @@ import org.sakaiproject.alias.api.AliasService;
 import org.sakaiproject.api.privacy.PrivacyManager;
 import org.sakaiproject.archive.api.ImportMetadata;
 import org.sakaiproject.archive.cover.ArchiveService;
+import org.sakaiproject.assignment.api.AssignmentService;
 import org.sakaiproject.authz.api.AuthzGroup;
 import org.sakaiproject.authz.api.AuthzPermissionException;
 import org.sakaiproject.authz.api.GroupNotDefinedException;
@@ -8863,6 +8864,8 @@ private Map<String, List<MyTool>> getTools(SessionState state, String type, Site
 		List<String> userUpdated = new Vector<String>();
 		// list of all removed user
 		List<String> usersDeleted = new Vector<String>();
+		// list of markers to prevent removal - empty set.
+		Set<String> markersWithMarking = new HashSet<>();
 	
 		if (authzGroupService.allowUpdate(realmId)
 						|| SiteService.allowUpdateSiteMembership(s.getId())) {
@@ -8890,6 +8893,18 @@ private Map<String, List<MyTool>> getTools(SessionState state, String type, Site
 					return;
 				}
 
+				//NAM-43				
+				if (ServerConfigurationService.getBoolean("assignment.useMarker", false)) {
+					AssignmentService assignmentService = ComponentManager.get(AssignmentService.class);
+					Set<String> markersBeingAffected = testMarkersBeingChanged(participants, params);
+					markersWithMarking = assignmentService.checkParticipantsForMarking(s.getId(), markersBeingAffected);
+
+					if (markersWithMarking.size() > 0) {
+						log.error("Could not remove user from realm due to marking assignment");
+						addAlert(state, rb.getFormattedMessage("sitegen.siteinfolist.marker"));
+					}
+				}
+				
 				// SAK23029 - proposed changes do not leave site w/o maintainers; proceed with any allowed updates
 			
 				// list of roles being added or removed
@@ -8905,77 +8920,87 @@ private Map<String, List<MyTool>> getTools(SessionState state, String type, Site
 					// added participant
 					id = participant.getUniqname();
 
-					if (id != null) {
-						// get the newly assigned role
-						String inputRoleField = "role" + id;
-						String roleId = params.getString(inputRoleField);
-						String oldRoleId = participant.getRole();
-						boolean roleChange = roleId != null && !roleId.equals(oldRoleId);
-						
-						// get the grant active status
-						boolean activeGrant = true;
-						String activeGrantField = "activeGrant" + id;
-						if (params.getString(activeGrantField) != null) {
-							activeGrant = params
-									.getString(activeGrantField)
-									.equalsIgnoreCase("true") ? true
-									: false;
-						}
-						boolean activeGrantChange = roleId != null && (participant.isActive() && !activeGrant || !participant.isActive() && activeGrant);
-						
-						// save any roles changed for permission check
-						if (roleChange) {
-						    roles.add(roleId);
-						    roles.add(oldRoleId);
-						}
-						
-						// SAK-23257 - display an error message if the new role is in the restricted role list
-						String siteType = s.getType();
-						List<Role> allowedRoles = SiteParticipantHelper.getAllowedRoles( siteType, getRoles( state ) );
-						for( String roleName : roles )
-						{
-							Role r = realmEdit.getRole( roleName );
-							if( !allowedRoles.contains( r ) )
-							{
-								addAlert( state, rb.getFormattedMessage( "java.roleperm", new Object[] { roleName } ) );
-							    return;
-							}
-						}
-						
-						if (roleChange || activeGrantChange)
-						{
-								boolean fromProvider = !participant.isRemoveable();
-								if (fromProvider && !roleId.equals(participant.getRole())) {
-									    fromProvider = false;
-								}
-								realmEdit.addMember(id, roleId, activeGrant,
-									fromProvider);
-							String currentUserId = (String) state.getAttribute(STATE_CM_CURRENT_USERID);
-							String[] userAuditString = {s.getId(),participant.getEid(),roleId,userAuditService.USER_AUDIT_ACTION_UPDATE,userAuditRegistration.getDatabaseSourceKey(),currentUserId};
-							userAuditList.add(userAuditString);
+					//NAM-43 add check here to remove users in markerList from the participants being changed.
+					//This check prevents the marker from being inactivated.
+					if((s.getToolForCommonId("sakai.assignment.grades")!=null)&&(markersWithMarking.contains(id)))
+					{
+						//We do nothing here as we have already created an Alert and this just stops the processing for this user.	
+					}
+					else
+					{
+						if (id != null) {
+							// get the newly assigned role
+							String inputRoleField = "role" + id;
+							String roleId = params.getString(inputRoleField);
+							String oldRoleId = participant.getRole();
+							boolean roleChange = roleId != null && !roleId.equals(oldRoleId);
 							
-								// construct the event string
-								String userUpdatedString = "uid=" + id;
-								if (roleChange)
+							// get the grant active status
+							boolean activeGrant = true;
+							String activeGrantField = "activeGrant" + id;
+							if (params.getString(activeGrantField) != null) {
+								activeGrant = params
+										.getString(activeGrantField)
+										.equalsIgnoreCase("true") ? true
+										: false;
+							}
+							boolean activeGrantChange = roleId != null && (participant.isActive() && !activeGrant || !participant.isActive() && activeGrant);
+							
+							// save any roles changed for permission check
+							if (roleChange) {
+							    roles.add(roleId);
+							    roles.add(oldRoleId);
+							}
+							
+							// SAK-23257 - display an error message if the new role is in the restricted role list
+							String siteType = s.getType();
+							List<Role> allowedRoles = SiteParticipantHelper.getAllowedRoles( siteType, getRoles( state ) );
+							for( String roleName : roles )
+							{
+								Role r = realmEdit.getRole( roleName );
+								if( !allowedRoles.contains( r ) )
 								{
-									userUpdatedString += ";oldRole=" + oldRoleId + ";newRole=" + roleId;
+									addAlert( state, rb.getFormattedMessage( "java.roleperm", new Object[] { roleName } ) );
+								    return;
 								}
-								else
-								{
-									userUpdatedString += ";role=" + roleId;
-								}
-								if (activeGrantChange)
-								{
-									userUpdatedString += ";oldActive=" + participant.isActive() + ";newActive=" + activeGrant;
-								}
-								else
-								{
-									userUpdatedString += ";active=" + activeGrant;
-								}
-								userUpdatedString += ";provided=" + fromProvider;
+							}
+							
+							if (roleChange || activeGrantChange)
+							{
+									boolean fromProvider = !participant.isRemoveable();
+									if (fromProvider && !roleId.equals(participant.getRole())) {
+										    fromProvider = false;
+									}
+									realmEdit.addMember(id, roleId, activeGrant,
+										fromProvider);
+								String currentUserId = (String) state.getAttribute(STATE_CM_CURRENT_USERID);
+								String[] userAuditString = {s.getId(),participant.getEid(),roleId,userAuditService.USER_AUDIT_ACTION_UPDATE,userAuditRegistration.getDatabaseSourceKey(),currentUserId};
+								userAuditList.add(userAuditString);
 								
-								// add to the list for all participants that have role changes
-								userUpdated.add(userUpdatedString);
+									// construct the event string
+									String userUpdatedString = "uid=" + id;
+									if (roleChange)
+									{
+										userUpdatedString += ";oldRole=" + oldRoleId + ";newRole=" + roleId;
+									}
+									else
+									{
+										userUpdatedString += ";role=" + roleId;
+									}
+									if (activeGrantChange)
+									{
+										userUpdatedString += ";oldActive=" + participant.isActive() + ";newActive=" + activeGrant;
+									}
+									else
+									{
+										userUpdatedString += ";active=" + activeGrant;
+									}
+									userUpdatedString += ";provided=" + fromProvider;
+									
+									// add to the list for all participants that have role changes
+									userUpdated.add(userUpdatedString);
+	
+							}
 						}
 					}
 				}
@@ -8987,35 +9012,44 @@ private Map<String, List<MyTool>> getTools(SessionState state, String type, Site
 					state.setAttribute(STATE_SELECTED_USER_LIST, removals);
 					for (int i = 0; i < removals.size(); i++) {
 						String rId = (String) removals.get(i);
-						try {
-							User user = UserDirectoryService.getUser(rId);
-							 // save role for permission check
-							if (user != null) {
-								String userId = user.getId();
-								Member userMember = realmEdit
-										.getMember(userId);
-								if (userMember != null) {
-									Role role = userMember.getRole();
-									if (role != null) {
-										roles.add(role.getId());
+						//NAM-43 add check here to remove users in markerList from the participants being changed.
+						//This check prevents the current ID pulled from participants being processed if it matches a marker in the site with marking.
+						if((s.getToolForCommonId("sakai.assignment.grades")!=null)&&(markersWithMarking.contains(rId)))
+						{
+							//We do nothing here as we have already created an Alert and this just stops the processing for this user.
+						}
+						else
+						{
+							try {
+								User user = UserDirectoryService.getUser(rId);
+								 // save role for permission check
+								if (user != null) {
+									String userId = user.getId();
+									Member userMember = realmEdit
+											.getMember(userId);
+									if (userMember != null) {
+										Role role = userMember.getRole();
+										if (role != null) {
+											roles.add(role.getId());
+										}
+										realmEdit.removeMember(userId);
+										usersDeleted.add("uid=" + userId);
+										String currentUserId = (String) state.getAttribute(STATE_CM_CURRENT_USERID);
+										String[] userAuditString = {s.getId(),user.getEid(),role.getId(),userAuditService.USER_AUDIT_ACTION_REMOVE,userAuditRegistration.getDatabaseSourceKey(),currentUserId};
+										userAuditList.add(userAuditString);
 									}
-									realmEdit.removeMember(userId);
-									usersDeleted.add("uid=" + userId);
-									String currentUserId = (String) state.getAttribute(STATE_CM_CURRENT_USERID);
-									String[] userAuditString = {s.getId(),user.getEid(),role.getId(),userAuditService.USER_AUDIT_ACTION_REMOVE,userAuditRegistration.getDatabaseSourceKey(),currentUserId};
-									userAuditList.add(userAuditString);
 								}
-							}
-						} catch (UserNotDefinedException e) {
-							log.error(this + ".doUpdate_participant: IdUnusedException " + rId + ". ", e);
-							if (("admins".equals(showOrphanedMembers) && SecurityService.isSuperUser()) || ("maintainers".equals(showOrphanedMembers))) {
-								Member userMember = realmEdit.getMember(rId);
-								if (userMember != null) {
-									Role role = userMember.getRole();
-									if (role != null) {
-										roles.add(role.getId());
+							} catch (UserNotDefinedException e) {
+								log.error(this + ".doUpdate_participant: IdUnusedException " + rId + ". ", e);
+								if (("admins".equals(showOrphanedMembers) && SecurityService.isSuperUser()) || ("maintainers".equals(showOrphanedMembers))) {
+									Member userMember = realmEdit.getMember(rId);
+									if (userMember != null) {
+										Role role = userMember.getRole();
+										if (role != null) {
+											roles.add(role.getId());
+										}
+										realmEdit.removeMember(rId);
 									}
-									realmEdit.removeMember(rId);
 								}
 							}
 						}
@@ -9088,6 +9122,50 @@ private Map<String, List<MyTool>> getTools(SessionState state, String type, Site
 
 	} // doUpdate_participant
 
+	// NAM-43
+	private Set<String> testMarkersBeingChanged(List<Participant> participants, ParameterParser params) {
+		Set<String> removedParticipantIds = new HashSet();
+		Set<String> deactivatedParticipants = new HashSet();
+		Set<String> markerRoledParticipants = new HashSet();
+		// create list of all partcipants being removed
+		if (params.getStrings("selectedUser") != null) {
+			List removals = new ArrayList(Arrays.asList(params.getStrings("selectedUser")));
+			for (int i = 0; i < removals.size(); i++) {
+				String rId = (String) removals.get(i);
+				removedParticipantIds.add(rId);
+			}
+		}
+		// create list of all participants that have been deactivated
+		for (Participant statusParticipant : participants) {
+			String activeGrantId = statusParticipant.getUniqname();
+			String activeGrantField = "activeGrant" + activeGrantId;
+			if (params.getString(activeGrantField) != null) {
+				boolean activeStatus = params.getString(activeGrantField).equalsIgnoreCase("true") ? true : false;
+				if (activeStatus == false) {
+					deactivatedParticipants.add(activeGrantId);
+				}
+			}
+		}
+		// create list of all participants that have role changes
+		for (Object roleParticipant : participants) {
+			String id = ((Participant) roleParticipant).getUniqname();
+			String roleId = "role" + id;
+			String newRole = params.getString(roleId);
+			if (newRole != null) {
+				if (!newRole.equals(((Participant) roleParticipant).getRole())) {
+					markerRoledParticipants.add(roleId + ":" + id); // we need the roleID and the userID in the set.
+				}
+			}
+		}
+
+		Set<String> markersAffected = new HashSet();
+		markersAffected.addAll(removedParticipantIds);
+		markersAffected.addAll(deactivatedParticipants);
+		markersAffected.addAll(markerRoledParticipants);
+
+		return markersAffected;
+	}
+	
 	/**
 	 * update realted group realm setting according to parent site realm changes
 	 * @param s

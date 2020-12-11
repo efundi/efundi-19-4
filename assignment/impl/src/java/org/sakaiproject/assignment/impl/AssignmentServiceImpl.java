@@ -75,11 +75,14 @@ import org.sakaiproject.assignment.api.AssignmentService;
 import org.sakaiproject.assignment.api.AssignmentServiceConstants;
 import org.sakaiproject.assignment.api.ContentReviewResult;
 import org.sakaiproject.assignment.api.model.Assignment;
+import org.sakaiproject.assignment.api.model.AssignmentMarker;
+import org.sakaiproject.assignment.api.model.AssignmentMarkerHistory;
 import org.sakaiproject.assignment.api.model.AssignmentAllPurposeItem;
 import org.sakaiproject.assignment.api.model.AssignmentAllPurposeItemAccess;
 import org.sakaiproject.assignment.api.model.AssignmentModelAnswerItem;
 import org.sakaiproject.assignment.api.model.AssignmentNoteItem;
 import org.sakaiproject.assignment.api.model.AssignmentSubmission;
+import org.sakaiproject.assignment.api.model.AssignmentSubmissionMarker;
 import org.sakaiproject.assignment.api.model.AssignmentSubmissionSubmitter;
 import org.sakaiproject.assignment.api.model.AssignmentSupplementItemAttachment;
 import org.sakaiproject.assignment.api.model.AssignmentSupplementItemService;
@@ -246,7 +249,9 @@ public class AssignmentServiceImpl implements AssignmentService, EntityTransferr
         functionManager.registerFunction(SECURE_GRADE_ASSIGNMENT_SUBMISSION);
         functionManager.registerFunction(SECURE_ASSIGNMENT_RECEIVE_NOTIFICATIONS);
         functionManager.registerFunction(SECURE_SHARE_DRAFTS);
-
+        // NAM-24 Marker Permission
+        functionManager.registerFunction(SECURE_ASSIGNMENT_MARKER);
+        
         // this is needed to avoid a circular dependency, notice we set the AssignmentService proxy and not this
         assignmentSupplementItemService.setAssignmentService(applicationContext.getBean(AssignmentService.class));
     }
@@ -636,6 +641,15 @@ public class AssignmentServiceImpl implements AssignmentService, EntityTransferr
         // if not, see if the user has any groups to which adds are allowed
         return (!getGroupsAllowAddAssignment(context).isEmpty());
     }
+    
+    /**
+     * NAM-34 AND NAM-36 Check if user has marker role
+     */
+    @Override
+    public boolean allowUserMarkerDownloadAndStats(String context) {
+    	String resourceString = AssignmentReferenceReckoner.reckoner().context(context).reckon().getReference();
+    	return permissionCheck(SECURE_ASSIGNMENT_MARKER, resourceString, null);
+    }
 
     @Override
     public boolean allowRemoveAssignmentInContext(String context) {
@@ -886,6 +900,8 @@ public class AssignmentServiceImpl implements AssignmentService, EntityTransferr
                 assignment.setAllowAttachments(existingAssignment.getAllowAttachments());
                 // for ContentReview service
                 assignment.setContentReview(existingAssignment.getContentReview());
+                // for Assignment Marking
+				assignment.setIsMarker(existingAssignment.getIsMarker());
 
                 //duplicating attachments
                 Set<String> tempAttach = existingAssignment.getAttachments();
@@ -1471,6 +1487,92 @@ public class AssignmentServiceImpl implements AssignmentService, EntityTransferr
         return null;
     }
 
+    private Map<User, AssignmentSubmission> getUserSubmissionMap(Assignment assignment, boolean isMarker, boolean isMarkerPartialDownload) {
+		Map<User, AssignmentSubmission> userSubmissionMap = new HashMap<>();
+		if (assignment != null) {
+			
+			if (assignment.getIsMarker() && isMarker && !assignment.getIsGroup()) {
+				return getUserSubmissionMapForMarker(userSubmissionMap, assignment, isMarkerPartialDownload);
+			}
+			
+			if (assignment.getIsGroup()) {
+				// All this block does is some verification of members in the group and the submissions submitters
+				try {
+					Site site = siteService.getSite(assignment.getContext());
+					for (AssignmentSubmission submission : assignment.getSubmissions()) {
+						String gid = submission.getGroupId();
+						if (StringUtils.isNotBlank(gid)) {
+							Group group = site.getGroup(gid);
+							if (group != null) {
+								Set<String> members = group.getMembers().stream().map(Member::getUserId).collect(Collectors.toSet());
+								Set<String> submitters = submission.getSubmitters().stream().map(AssignmentSubmissionSubmitter::getSubmitter).collect(Collectors.toSet());
+								log.debug("Checking for consistency of group members [{}] to submitters [{}]", members.size(), submitters.size());
+								if (Collections.disjoint(members, submitters)) {
+									log.warn("DISJOINT group members and submitters detected");
+									List<String> submittersNotMembers = submitters.stream().filter(s -> !members.contains(s)).collect(Collectors.toList());
+									log.warn("DISJOINT there are {} submitters that are not a member of a group: {}", submittersNotMembers.size(), submittersNotMembers);
+									List<String> membersNotSubmitters = members.stream().filter(s -> !submitters.contains(s)).collect(Collectors.toList());
+									log.warn("DISJOINT there are {} members that are not a submitter: {}", membersNotSubmitters.size(), membersNotSubmitters);
+								} else {
+									log.debug("All members of group: {}::{} are submitters", gid, group.getTitle());
+								}
+							} else {
+								log.warn("Submission contains a group that doesn't exist in the site, submission: {}, group: {}", submission.getId(), gid);
+								break;
+							}
+						}
+					}
+				} catch (IdUnusedException e) {
+					log.warn("Could not fetch site for assignment: {} with a context of: {}");
+				}
+			}
+            // Simply we add every AssignmentSubmissionSubmitter to the Map, this works equally well for group submissions
+            for (AssignmentSubmission submission : assignment.getSubmissions()) {
+                for (AssignmentSubmissionSubmitter submitter : submission.getSubmitters()) {
+                    try {
+                        User user = userDirectoryService.getUser(submitter.getSubmitter());
+                        userSubmissionMap.put(user, submission);
+                    } catch (UserNotDefinedException e) {
+                        log.warn("Could not find user: {}, that is a submitter for submission: {}", submitter.getSubmitter(), submission.getId());
+                    }
+                }
+            }
+		}
+		return userSubmissionMap;
+	}
+
+	private Map<User, AssignmentSubmission> getUserSubmissionMapForMarker(Map<User, AssignmentSubmission> userSubmissionMap, Assignment assignment, boolean isMarkerPartialDownload) {
+		List<AssignmentSubmissionMarker> submissionMarkers = findSubmissionMarkersByIdAndAssignmentId(assignment.getId(), userDirectoryService.getCurrentUser().getEid());
+		AssignmentSubmission assignmentSubmission = null;
+		if (CollectionUtils.isNotEmpty(submissionMarkers)) {
+			for (AssignmentSubmissionMarker assignmentSubmissionMarker : submissionMarkers) {
+				assignmentSubmission = assignmentSubmissionMarker.getAssignmentSubmission();
+				if(isMarkerPartialDownload) {
+					if(!assignmentSubmissionMarker.getDownloaded()) {
+						for (AssignmentSubmissionSubmitter submitter : assignmentSubmission.getSubmitters()) {
+							try {
+								User user = userDirectoryService.getUser(submitter.getSubmitter());
+								userSubmissionMap.put(user, assignmentSubmission);
+							} catch (UserNotDefinedException e) {
+								log.warn("Could not find user: {}, that is a submitter for submission: {}", submitter.getSubmitter(), assignmentSubmission.getId());
+							}
+						}
+					}
+				} else {
+					for (AssignmentSubmissionSubmitter submitter : assignmentSubmission.getSubmitters()) {
+						try {
+							User user = userDirectoryService.getUser(submitter.getSubmitter());
+							userSubmissionMap.put(user, assignmentSubmission);
+						} catch (UserNotDefinedException e) {
+							log.warn("Could not find user: {}, that is a submitter for submission: {}", submitter.getSubmitter(), assignmentSubmission.getId());
+						}
+					}
+				}
+			}
+		}
+		return userSubmissionMap;
+	}
+    
     @Override
     public AssignmentSubmission getSubmission(List<AssignmentSubmission> submissions, User person) {
         throw new UnsupportedOperationException("Method is deprecated, remove");
@@ -1674,6 +1776,9 @@ public class AssignmentServiceImpl implements AssignmentService, EntityTransferr
         String contextString = "";
         String searchString = "";
         String searchFilterOnly = "";
+        boolean isMarker = false;
+		boolean isMarkerPartialDownload = false;
+		boolean isMarkerDownloadAll = false;
 
         if (query != null) {
             StringTokenizer queryTokens = new StringTokenizer(query, "&");
@@ -1732,6 +1837,18 @@ public class AssignmentServiceImpl implements AssignmentService, EntityTransferr
                     // search and group filter only
                     searchFilterOnly = token.contains("=") ? token.substring(token.indexOf("=") + 1) : "";
                 }
+                if (token.contains("isMarker")) {
+					// should contain student submission text information
+					isMarker = true;
+				}
+				if (token.contains("markerDownloadPartial=true")) {
+					// should contain student submission text information
+					isMarkerPartialDownload = true;
+				}
+				if (token.contains("markerDownloadAll=true")) {
+					// should contain student submission text information
+					isMarkerDownloadAll = true;
+				}
             }
         }
 
@@ -1789,7 +1906,7 @@ public class AssignmentServiceImpl implements AssignmentService, EntityTransferr
                         viewString.length() == 0 ? AssignmentConstants.ALL : viewString,
                         searchString,
                         reference,
-                        contextString == null ? assignment.getContext() : contextString);
+                        contextString == null ? assignment.getContext() : contextString, isMarker, isMarkerPartialDownload);
 
                 if (!submitters.isEmpty()) {
                     List<AssignmentSubmission> submissions = new ArrayList<AssignmentSubmission>(submitters.values());
@@ -1821,6 +1938,11 @@ public class AssignmentServiceImpl implements AssignmentService, EntityTransferr
                                 assignment.getContext());
                         if (exceptionMessage.length() > 0) {
                             log.warn("Encountered and issue while zipping submissions for ref = {}, exception message {}", reference, exceptionMessage);
+                        } else {
+                        	updateAssignment(assignment);
+                        	if(assignment.getIsMarker() && isMarker) {
+                        		updateDownloadedSubmissionMarkers(submissions.iterator());
+                        	}
                         }
                     }
                 }
@@ -2018,7 +2140,7 @@ public class AssignmentServiceImpl implements AssignmentService, EntityTransferr
     @Transactional
     public List<String> getSubmitterIdList(String searchFilterOnly, String allOrOneGroup, String searchString, String aRef, String contextString) {
         List<String> rv = new ArrayList<>();
-        Map<User, AssignmentSubmission> submitterMap = getSubmitterMap(searchFilterOnly, allOrOneGroup, searchString, aRef, contextString);
+        Map<User, AssignmentSubmission> submitterMap = getSubmitterMap(searchFilterOnly, allOrOneGroup, searchString, aRef, contextString, false, false);
         for (User u : submitterMap.keySet()) {
             rv.add(u.getId());
         }
@@ -2028,7 +2150,7 @@ public class AssignmentServiceImpl implements AssignmentService, EntityTransferr
 
     @Override
     @Transactional
-    public Map<User, AssignmentSubmission> getSubmitterMap(String searchFilterOnly, String allOrOneGroup, String searchString, String aRef, String contextString) {
+    public Map<User, AssignmentSubmission> getSubmitterMap(String searchFilterOnly, String allOrOneGroup, String searchString, String aRef, String contextString, boolean isMarker, boolean isMarkerPartialDownload) {
         Map<User, AssignmentSubmission> submitterMap = new HashMap<>();
 
         Assignment assignment = null;
@@ -2094,6 +2216,12 @@ public class AssignmentServiceImpl implements AssignmentService, EntityTransferr
             }
 
             if (!users.isEmpty()) {
+            	List<String> groupRefs = new ArrayList<String>();
+            	Map<User, AssignmentSubmission>  userSubmissionMap = new HashMap<User, AssignmentSubmission>();
+            	if (assignment.getIsMarker() && isMarker) {
+            		return getUserSubmissionMap(assignment, isMarker, isMarkerPartialDownload);
+            	}
+            	userSubmissionMap = getUserSubmissionMap(assignment, false, false);
                 List<String> userids = users.stream().filter(Objects::nonNull).map(User::getId).collect(Collectors.toList());
 
                 List<AssignmentSubmission> submissions = assignmentRepository.findSubmissionForUsers(assignment.getId(), userids);
@@ -2866,7 +2994,7 @@ public class AssignmentServiceImpl implements AssignmentService, EntityTransferr
             String caughtStackTrace = null;
             final StringBuilder submittersAdditionalNotesHtml = new StringBuilder();
 
-            while (submissions.hasNext()) {
+            OUTER: while (submissions.hasNext()) {
             	final AssignmentSubmission s = (AssignmentSubmission) submissions.next();
                 boolean isAnon = assignmentUsesAnonymousGrading(s.getAssignment());
                 //SAK-29314 added a new value where it's by default submitted but is marked when the user submits
@@ -3597,6 +3725,9 @@ public class AssignmentServiceImpl implements AssignmentService, EntityTransferr
 
                     // review service
                     nAssignment.setContentReview(oAssignment.getContentReview());
+                    
+                    // Assignment Marking
+                    nAssignment.setIsMarker(oAssignment.getIsMarker());
 
                     // attachments
                     Set<String> oAttachments = oAssignment.getAttachments();
@@ -4156,4 +4287,656 @@ public class AssignmentServiceImpl implements AssignmentService, EntityTransferr
 
         return errorMessage;
     }
+
+	@Override
+	@Transactional
+	public void updateAssignmentMarker(AssignmentMarker assignmentMarker) throws PermissionException {
+		Assert.notNull(assignmentMarker, "AssignmentMarker cannot be null");
+		if (assignmentMarker.getId() == null) {
+			assignmentRepository.createAssignmentMarker(assignmentMarker);
+			eventTrackingService.post(eventTrackingService.newEvent(AssignmentConstants.EVENT_MARKER_ASSIGNMENT_ADD,
+					assignmentMarker.getId(), false));
+		} else {
+			AssignmentMarker marker = assignmentRepository.findAssignmentMarker(assignmentMarker.getId());
+			if (marker == null) {
+				assignmentRepository.createAssignmentMarker(assignmentMarker);
+				eventTrackingService.post(eventTrackingService.newEvent(AssignmentConstants.EVENT_MARKER_ASSIGNMENT_ADD,
+						assignmentMarker.getId(), false));
+			} else {
+				if (!marker.getMarkerUserId().equals(assignmentMarker.getMarkerUserId())
+						|| !marker.getQuotaPercentage().equals(assignmentMarker.getQuotaPercentage())
+						|| marker.getNumberAllocated().equals(assignmentMarker.getNumberAllocated())) {
+					assignmentMarker.setModifier(sessionManager.getCurrentSessionUserId());
+					assignmentRepository.updateAssignmentMarker(assignmentMarker);
+					eventTrackingService.post(eventTrackingService.newEvent(
+							AssignmentConstants.EVENT_MARKER_ASSIGNMENT_EDIT, assignmentMarker.getId(), true));
+				}
+			}
+		}
+	}
+
+	@Override
+	public Set<AssignmentMarker> buildAssignmentMarkerObjSetForSite(String siteId) {
+		Set<AssignmentMarker> siteAssignmentMarkers = new HashSet<AssignmentMarker>();
+		try {
+			AuthzGroup realm = authzGroupService.getAuthzGroup(siteService.siteReference(siteId));
+			Set<String> allowedMarkers = realm.getUsersIsAllowed(SECURE_ASSIGNMENT_MARKER);
+			AssignmentMarker assignmentMarker = null;
+			User user = null;
+			for (String userId : allowedMarkers) {
+				try {
+					user = userDirectoryService.getUser(userId);
+					if (user != null && !securityService.isSuperUser(user.getEid())) {
+						assignmentMarker = new AssignmentMarker();
+						assignmentMarker.setContext(siteId);
+						assignmentMarker.setMarkerUserId(user.getEid());
+						assignmentMarker.setUserDisplayName(user.getEid() + " (" + user.getDisplayName() + ")");
+						siteAssignmentMarkers.add(assignmentMarker);
+					}
+				} catch (UserNotDefinedException e) {
+					log.error("Could not find user with id = {}, {}", userId, e.getMessage());
+				}
+			}
+		} catch (GroupNotDefinedException e) {
+			log.warn("Cannot get authz group for site = {}, {}", siteId, e.getMessage());
+		}
+		return siteAssignmentMarkers;
+	}
+
+	@Override
+	public Set<AssignmentMarker> getMarkersForAssignment(Assignment assignment) {
+		Set<AssignmentMarker> siteAssignmentMarkers = new HashSet<AssignmentMarker>();
+		List<AssignmentMarker> assignmentMarkers = assignmentRepository
+				.findMarkersForAssignmentById(assignment.getId());
+		if (CollectionUtils.isNotEmpty(assignmentMarkers)) {
+			AssignmentMarker assignmentMarker = null;
+			User user = null;
+			Iterator<AssignmentMarker> assignmentMarkerSetIter = assignmentMarkers.iterator();
+			while (assignmentMarkerSetIter.hasNext()) {
+				assignmentMarker = assignmentMarkerSetIter.next();
+				try {
+					user = userDirectoryService.getUserByEid(assignmentMarker.getMarkerUserId());
+					if (user != null) {
+						assignmentMarker.setUserDisplayName(user.getEid() + " (" + user.getDisplayName() + ")");
+						siteAssignmentMarkers.add(assignmentMarker);
+					}
+				} catch (UserNotDefinedException e) {
+					log.error("Could not find user with id = {}, {}", assignmentMarker.getMarkerUserId(),
+							e.getMessage());
+				}
+			}
+			updateMarkerListIfNewMarkersAdded(assignment.getContext(), siteAssignmentMarkers, assignment);
+		}
+		return siteAssignmentMarkers;
+	}
+
+	/**
+	 * If new participants were added to the Site after site markers has already
+	 * been used for Assignments, the new Markers must also bve added
+	 * 
+	 * @param siteId
+	 * @param assignmentMarkers
+	 */
+	private void updateMarkerListIfNewMarkersAdded(String siteId, Set<AssignmentMarker> assignmentMarkers,
+			Assignment assignment) {
+
+		try {
+			AuthzGroup realm = authzGroupService.getAuthzGroup(siteService.siteReference(siteId));
+			Set<String> allowedMarkers = realm.getUsersIsAllowed(SECURE_ASSIGNMENT_MARKER);
+			boolean found = false;
+			User user = null;
+			AssignmentMarker assignmentMarker = null;
+			for (String userId : allowedMarkers) {
+				try {
+					user = userDirectoryService.getUser(userId);
+					if (user != null && !securityService.isSuperUser(user.getEid())) {
+						Iterator<AssignmentMarker> assignmentMarkerSetIter = assignmentMarkers.iterator();
+						while (assignmentMarkerSetIter.hasNext()) {
+							assignmentMarker = assignmentMarkerSetIter.next();
+							if (assignmentMarker.getMarkerUserId().equals(user.getEid())) {
+								found = true;
+								break;
+							}
+						}
+						if (!found) {
+							assignmentMarker = new AssignmentMarker();
+							assignmentMarker.setContext(siteId);
+							assignmentMarker.setUserDisplayName(user.getEid() + " (" + user.getDisplayName() + ")");
+							assignmentMarker.setMarkerUserId(user.getEid());
+							assignmentMarker.setAssignment(assignment);
+							assignmentMarkers.add(assignmentMarker);
+							assignmentRepository.createAssignmentMarker(assignmentMarker);
+						}
+					}
+					found = false;
+				} catch (UserNotDefinedException e) {
+					log.error("Could not find user with id = {}, {}", userId, e.getMessage());
+				}
+			}
+
+		} catch (GroupNotDefinedException e) {
+			log.warn("Cannot get authz group for site = {}, {}", siteId, e.getMessage());
+		}
+	}
+
+	// NAM-23
+	public Boolean allowRemoveUserWithRoleIfMarkingUsed(String contextString, String role) {
+		try {
+			Collection<Assignment> assignments = getAssignmentsForContext(contextString);
+			Site site = siteService.getSite(contextString);
+			List<AssignmentMarker> assignmentMarkers = Collections.emptyList();
+			Set<String> allowedMarkers = site.getUsersIsAllowed(SECURE_ASSIGNMENT_MARKER);
+			if (CollectionUtils.isEmpty(allowedMarkers)) {
+				return true;
+			}
+			for (Assignment assignment : assignments) {
+				if (assignment.getIsMarker()) {
+					assignmentMarkers = assignmentRepository.findMarkersForAssignmentById(assignment.getId());
+					for (AssignmentMarker marker : assignmentMarkers) {
+						if (allowedMarkers.contains(marker.getMarkerUserId())) {
+							return false;
+						}
+					}
+				}
+			}
+		} catch (IdUnusedException e1) {
+			log.warn("Cannot find site = {}, {}", contextString, e1.getMessage());
+		}
+		return true;
+	}
+
+	/* NAM-43 */
+	public Set<String> checkParticipantsForMarking(String siteId, Set<String> markersBeingAffected) {
+		Set<String> blockedChanges = new HashSet<String>();
+		try {
+			AuthzGroup realm = authzGroupService.getAuthzGroup(siteService.siteReference(siteId));
+			Set<String> allowedMarkers = getMarkersSetForSite(siteId); // gets markers with marking for this site.
+			Set<String> allowedMarkerRoles = realm.getRolesIsAllowed(SECURE_ASSIGNMENT_MARKER); // gets all roles with
+																								// permission
+
+			for (String user : markersBeingAffected) {
+				if ((user.contains(":"))) { // checks if this is a role change user
+					String role = user.substring(0, user.indexOf(":"));
+					String userID = user.substring(user.indexOf(":") + 1); // gets newRole and userID for checking
+					if (!allowedMarkerRoles.contains(role)) {
+						if (allowedMarkers.contains(userID)) {
+							blockedChanges.add(userID);
+						}
+					}
+				} else { // no role change, just check against marker list
+					if (allowedMarkers.contains(user)) {
+						log.error("NoRole: " + user);
+						blockedChanges.add(user);
+					}
+				}
+			}
+		} catch (GroupNotDefinedException e) {
+			log.warn("Cannot get authz group for site = {}, {}", siteId, e.getMessage());
+		}
+		return blockedChanges;
+	}
+
+	private Set<String> getMarkersSetForSite(String contextString) {
+		Collection<Assignment> asnCollection = getAssignmentsForContext(contextString);
+		Set<String> userIds = new HashSet<String>();
+		for (Assignment assignmentObj : asnCollection) {
+			Set<AssignmentMarker> asnMrks = assignmentObj.getMarkers();
+			for (AssignmentMarker asnMarker : asnMrks) {
+				String id;
+				try {
+					if (asnMarker.getNumberAllocated() > 0) {
+						id = userDirectoryService.getUserId(asnMarker.getMarkerUserId());
+						userIds.add(id);
+					}
+				} catch (UserNotDefinedException e) {
+					log.warn("User not defined: {}", asnMarker.getMarkerUserId(), e.getMessage());
+				}
+			}
+		}
+		return userIds;
+	}
+
+	public void createAssignmentMarkerHistory(AssignmentMarkerHistory assignmentMarkerHistory)
+			throws PermissionException {
+		Assert.notNull(assignmentMarkerHistory, "AssignmentMarkerHistory cannot be null");
+		assignmentRepository.createAssignmentMarkerHistory(assignmentMarkerHistory);
+		eventTrackingService.post(eventTrackingService.newEvent(AssignmentConstants.EVENT_MARKER_ASSIGNMENT_REASSIGN,
+				assignmentMarkerHistory.getId(), false));
+	}
+
+	/**
+	 * NAM-36 Method Implementation
+	 */
+	@Override
+	public void setMarkersForAssignmentByLoggedInUser(Assignment assignment) {
+		Set<AssignmentMarker> markersForLoggedInUser = new HashSet<AssignmentMarker>();
+		List<AssignmentMarker> assignmentMarkers = assignmentRepository
+				.findMarkersForAssignmentById(assignment.getId());
+		if (CollectionUtils.isNotEmpty(assignmentMarkers)) {
+			AssignmentMarker assignmentMarker = null;
+			User user = null;
+			Iterator<AssignmentMarker> assignmentMarkerSetIter = assignmentMarkers.iterator();
+			String currentUserDisplayId = userDirectoryService.getCurrentUser().getDisplayId();
+			try {
+				AuthzGroup realm = authzGroupService.getAuthzGroup(siteService.siteReference(assignment.getContext()));
+				while (assignmentMarkerSetIter.hasNext()) {
+					assignmentMarker = assignmentMarkerSetIter.next();
+					user = userDirectoryService.getUserByEid(assignmentMarker.getMarkerUserId());
+					if (user != null) {
+						assignmentMarker.setUserDisplayName(user.getEid() + " (" + user.getDisplayName() + ")");
+						assignmentMarker.setUserDisplayId(user.getEid());
+						String role = "";
+						try {
+							role = realm.getUserRole(user.getId()).getId();
+						} catch (NullPointerException e) {
+							log.warn("AssignmentServiceImpl setMarkersForAssignmentByLoggedInUser " + e.getMessage());
+						}
+						assignmentMarker.setUserRole(role);
+						markersForLoggedInUser.add(assignmentMarker);
+					} else {
+						assignmentMarker.setUserDisplayName(assignmentMarker.getMarkerUserId() + " ( - )");
+						assignmentMarker.setUserDisplayId(assignmentMarker.getMarkerUserId());
+						assignmentMarker.setUserRole("");
+						markersForLoggedInUser.add(assignmentMarker);
+					}
+				}
+				assignment.setMarkers(markersForLoggedInUser);
+			} catch (UserNotDefinedException e) {
+				log.error("Could not find user with id = {}, {}", assignmentMarker.getMarkerUserId(), e.getMessage());
+			} catch (GroupNotDefinedException e) {
+				log.warn("Cannot get authz group for site = {}, {}", assignment.getContext(), e.getMessage());
+			}
+		}
+	}
+
+	@Override
+	public void createAssignmentSubmissionMarker(AssignmentSubmissionMarker assignmentSubmissionMarker)
+			throws PermissionException {
+		Assert.notNull(assignmentSubmissionMarker, "AssignmentSubmissionMarker cannot be null");
+		assignmentRepository.createAssignmentSubmissionMarker(assignmentSubmissionMarker);
+		eventTrackingService.post(eventTrackingService.newEvent(AssignmentConstants.EVENT_MARKER_ASSIGNMENT_ADD,
+				assignmentSubmissionMarker.getId(), false));
+	}
+
+	@Override
+	public void updateAssignmentSubmissionMarker(AssignmentSubmissionMarker assignmentSubmissionMarker,
+			String submissionEvent) throws PermissionException {
+		Assert.notNull(assignmentSubmissionMarker, "AssignmentSubmissionMarker cannot be null");
+		assignmentRepository.updateAssignmentSubmissionMarker(assignmentSubmissionMarker);
+		eventTrackingService
+				.post(eventTrackingService.newEvent(submissionEvent, assignmentSubmissionMarker.getId(), false));
+	}
+
+	@Override
+	public AssignmentSubmissionMarker findSubmissionMarkerForMarkerIdAndSubmissionId(String markerId,
+			String submissionId) {
+		return assignmentRepository.findSubmissionMarkerForMarkerIdAndSubmissionId(markerId, submissionId);
+	}
+
+	@Override
+	public List<AssignmentSubmissionMarker> findSubmissionMarkersByIdAndAssignmentId(String assignmentId,
+			String markerId) {
+		return assignmentRepository.findSubmissionMarkersByIdAndAssignmentId(assignmentId, markerId);
+	}
+
+	private void updateDownloadedSubmissionMarkers(Iterator<AssignmentSubmission> submissions) {
+		String currentUserEid = userDirectoryService.getCurrentUser().getEid();
+		AssignmentSubmission submission = null;
+		AssignmentSubmissionMarker submissionMarker = null;
+		AssignmentMarker asnMarker = null;
+		int downloads = 0;
+		while (submissions.hasNext()) {
+			submission = (AssignmentSubmission) submissions.next();
+			submissionMarker = findSubmissionMarkerForMarkerIdAndSubmissionId(currentUserEid, submission.getId());
+			if (submissionMarker != null) {
+				if (!submissionMarker.getDownloaded()) {
+					downloads++;
+				}
+				submissionMarker.setDownloaded(true);
+				asnMarker = submissionMarker.getAssignmentMarker();
+				try {
+					updateAssignmentSubmissionMarker(submissionMarker,
+							AssignmentConstants.EVENT_MARKER_ASSIGNMENT_DOWNLOAD);
+				} catch (PermissionException e) {
+					log.warn("Could not upate submissionMarker for download with submission {}, for marker: {}",
+							submission.getId(), currentUserEid);
+				}
+			}
+		}
+		asnMarker.setNumberDownloaded(asnMarker.getNumberDownloaded() + downloads);
+		try {
+			updateAssignmentMarker(asnMarker);
+		} catch (PermissionException e) {
+			log.warn("Could not upate AssignmentMarker for download with submission {}, for marker: {}",
+					submission.getId(), currentUserEid);
+		}
+	}
+
+	@Override
+	public boolean markerQuotaCalculation(Assignment assignment, AssignmentSubmission submission) {
+
+		Boolean success = false;
+		String assignmentId = assignment.getId();
+		List<AssignmentMarker> asnMrks = assignmentRepository.findMarkersForAssignmentById(assignmentId);
+
+		double totalSubmissions = getTotalAssignmentMarkerSubmissions(asnMrks);
+		totalSubmissions++;
+		AssignmentMarker currentMarker = getMarkerForSubmissionOfAssignment(asnMrks, totalSubmissions, assignmentId);
+
+		AssignmentSubmissionMarker asnSM = new AssignmentSubmissionMarker();
+		asnSM.setAssignmentSubmission(submission);
+		asnSM.setContext(assignment.getId());
+		asnSM.setAssignmentMarker(currentMarker);
+
+		try {
+			createAssignmentSubmissionMarker(asnSM);
+			success = true;
+		} catch (PermissionException e) {
+			log.warn("Could not upate submissionMarker for new submission {}, for assignment: {}", submission.getId(),
+					assignment.getId());
+		}
+
+		return success;
+	}
+
+	private AssignmentMarker getMarkerForSubmissionOfAssignment(List<AssignmentMarker> asnMrks, double totalSubmissions,
+			String assignmentId) {
+		AssignmentMarker currentMarker = findMarker(asnMrks, totalSubmissions);
+		if (currentMarker == null) {
+			for (AssignmentMarker assignmentMarker : asnMrks) {
+				assignmentMarker.setOrderNumber(0);
+				try {
+					updateAssignmentMarker(assignmentMarker);
+				} catch (PermissionException e) {
+					log.warn("Could not upate Assignment Marker {}", assignmentMarker.getId());
+				}
+			}
+			asnMrks = assignmentRepository.findMarkersForAssignmentById(assignmentId);
+			currentMarker = findMarker(asnMrks, totalSubmissions);
+		}
+		try {
+			updateAssignmentMarker(currentMarker);
+		} catch (PermissionException e) {
+			log.warn("Could not upate Assignment Marker {}", currentMarker.getId());
+		}
+		return currentMarker;
+	}
+
+	private AssignmentMarker findMarker(List<AssignmentMarker> asnMrks, double totalSubmissions) {
+		for (AssignmentMarker assignmentMarker : asnMrks) {
+			if (assignmentMarker.getOrderNumber() != 1) {
+				double quotaPercentage = assignmentMarker.getQuotaPercentage();
+				int numberAllocated = assignmentMarker.getNumberAllocated();
+				if (numberAllocated == 0 && quotaPercentage > 0) {
+					assignmentMarker.setOrderNumber(1);
+					numberAllocated++;
+					assignmentMarker.setNumberAllocated(numberAllocated);
+					return assignmentMarker;
+				} else {
+					double currentPercentage = (numberAllocated / totalSubmissions) * 100.00;
+					if (currentPercentage < quotaPercentage) {
+						assignmentMarker.setOrderNumber(1);
+						numberAllocated++;
+						assignmentMarker.setNumberAllocated(numberAllocated);
+						return assignmentMarker;
+					}
+				}
+			}
+		}
+		return null;
+	}
+
+	private double getTotalAssignmentMarkerSubmissions(List<AssignmentMarker> asnMrks) {
+		double totalSubmissionsAssigned = 0;
+		for (AssignmentMarker assignmentMarker : asnMrks) {
+			totalSubmissionsAssigned += assignmentMarker.getNumberAllocated();
+		}
+		return totalSubmissionsAssigned;
+	}
+
+	public void reassignSubmissionsNotMarked(AssignmentMarker oldMarker, AssignmentMarker newMarker, String context) { // need
+		int oldMarkersAllocation = oldMarker.getNumberAllocated();
+		int oldMarkersDownloaded = oldMarker.getNumberDownloaded();
+		int newMarkersAllocation = newMarker.getNumberAllocated();
+		boolean changeCheck = false;
+		List<AssignmentSubmissionMarker> markerSubmissions = findSubmissionMarkersByIdAndAssignmentId(
+				context.substring(19, context.length()), oldMarker.getMarkerUserId());
+		for (AssignmentSubmissionMarker assignmentSubmissionMarker : markerSubmissions) {
+			if (!assignmentSubmissionMarker.getUploaded()) {
+				assignmentSubmissionMarker.setAssignmentMarker(newMarker);
+				if (assignmentSubmissionMarker.getDownloaded()) {
+					oldMarkersDownloaded--;
+					assignmentSubmissionMarker.setDownloaded(false);
+				}
+
+				oldMarkersAllocation--;
+				newMarkersAllocation++;
+				try {
+					updateAssignmentSubmissionMarker(assignmentSubmissionMarker, "EVENT_MARKER_ASSIGNMENT_REASSIGN");
+					changeCheck = true;
+				} catch (PermissionException e) {
+					log.warn("Could not upate AssignmentSubmissionMarker {}", assignmentSubmissionMarker.getId());
+				} finally {
+					if (changeCheck) {
+						oldMarker.setNumberAllocated(oldMarkersAllocation);
+						oldMarker.setNumberDownloaded(oldMarkersDownloaded);
+						newMarker.setNumberAllocated(newMarkersAllocation);
+						newMarker.setOrderNumber(1);
+						try {
+							updateAssignmentMarker(newMarker);
+							updateAssignmentMarker(oldMarker);
+						} catch (PermissionException e) {
+							log.warn("Could not upate AssignmentMarkers {} and {}", newMarker.getId(),
+									oldMarker.getId());
+						}
+					}
+				}
+			}
+		}
+	}
+
+	public void quotaCalculationJob() {
+		if (serverConfigurationService.getBoolean("assignment.useMarker", false)) {
+			Collection<Assignment> assignments = findAllAssignmentsForMarkerQuotaCalculation();
+			String message;
+			Event event;
+			for (Assignment assignment : assignments) {
+				updateMarkerListIfNewMarkersAdded(assignment.getContext(), assignment.getMarkers(), assignment);
+				Set<AssignmentSubmission> missingAssignmentSubmissions = new HashSet<>();
+				Set<AssignmentSubmission> submissionSet = assignment.getSubmissions();
+				Set<AssignmentMarker> amSet = assignment.getMarkers();
+				Iterator<AssignmentMarker> markers = amSet.iterator();
+				while (markers.hasNext()) {
+					AssignmentMarker am = markers.next();
+					Set<AssignmentSubmissionMarker> asmSet = am.getSubmissionMarkers();
+					Iterator<AssignmentSubmissionMarker> asmIter = asmSet.iterator();
+					while (asmIter.hasNext()) {
+						AssignmentSubmissionMarker asm = asmIter.next();
+						AssignmentSubmission studentSubmission = asm.getAssignmentSubmission();
+						if (missingAssignmentSubmissions.contains(studentSubmission)) {
+							missingAssignmentSubmissions.remove(studentSubmission);
+						}
+						if (!submissionSet.contains(studentSubmission)) {
+							missingAssignmentSubmissions.add(studentSubmission);
+						}
+					}
+				}
+				if (CollectionUtils.isNotEmpty(missingAssignmentSubmissions)) {
+					Iterator<AssignmentSubmission> asIter = missingAssignmentSubmissions.iterator();
+					Integer submissionTotal = missingAssignmentSubmissions.size();
+					message = "AssignmentMarkerQuotaCalculationJob found: " + submissionTotal
+							+ " submissions that weren't assigned to markers";
+					event = eventTrackingService.newEvent(AssignmentConstants.EVENT_MARKER_QUOTA_CALCULATION, message,
+							false);
+					eventTrackingService.post(event);
+					while (asIter.hasNext()) {
+						AssignmentSubmission as = asIter.next();
+						if (markerQuotaCalculation(assignment, as)) {
+							message = "Submission: " + as + " has been assigned to a marker in assignment: "
+									+ assignment;
+							eventTrackingService.post(eventTrackingService
+									.newEvent(AssignmentConstants.EVENT_MARKER_QUOTA_CALCULATION, message, true));
+						}
+					}
+				}
+			}
+		}
+	}
+
+	public Boolean checkAssignmentMarkingForDeletedUsers(AssignmentMarker marker, Assignment assignment) {
+		String markerId = marker.getMarkerUserId();
+		try {
+			AuthzGroup realm = authzGroupService.getAuthzGroup(siteService.siteReference(assignment.getContext()));
+			String userId = null;
+			String role = null;
+			try {
+				userId = userDirectoryService.getUserId(markerId);
+				role = realm.getUserRole(userDirectoryService.getUserId(markerId)).getId();
+			} catch (NullPointerException e) {
+				String message = "";
+				if (userId == null) {
+					message = "User: " + markerId
+							+ " wasn't found in Sakai, but still had marking assigned to them for Assignment: "
+							+ assignment + " - Remaining marking will be reassigned";
+				} else if (role == null) {
+					message = "User: " + markerId + " wasn't found on site " + realm.getId()
+							+ ", but still had a database entry for Assignment: " + assignment
+							+ " - Removing database entry if marker was inactive";
+				}
+				eventTrackingService.post(eventTrackingService
+						.newEvent(AssignmentConstants.EVENT_MARKER_QUOTA_CALCULATION, message, true));
+				return true;
+			}
+		} catch (UserNotDefinedException | GroupNotDefinedException e) {
+			log.error("AssignmentServiceImpl assignmentHasMarkingForDeletedUser " + e.getMessage());
+		}
+		return false;
+	}
+
+	public void reassignMarkerQuotaForDeletedMarkers() {
+		Collection<Assignment> assignments = findAllAssignmentsForMarkerQuotaCalculation();
+		for (Assignment assignment : assignments) {
+			Set<AssignmentMarker> amSet = assignment.getMarkers();
+			try {
+				Iterator<AssignmentMarker> markers = amSet.iterator();
+				while (markers.hasNext()) {
+					AssignmentMarker am = markers.next();
+					if (checkAssignmentMarkingForDeletedUsers(am, assignment)) {
+						List<AssignmentSubmissionMarker> asmList = assignmentRepository
+								.findAssignmentMarkerUnmarkedSubmissions(assignment.getId(), am.getMarkerUserId());
+						reassignDeletedMarkersQuota(amSet, am);
+						if (CollectionUtils.isNotEmpty(asmList)) {
+							for (AssignmentSubmissionMarker asm : asmList) {
+								AssignmentSubmission submission = asm.getAssignmentSubmission();
+								// Phase 2 - Development
+								// assignmentRepository.deleteAssignmentSubmissionMarker(asm);
+								markerQuotaCalculation(assignment, submission);
+							}
+						}
+					}
+				}
+			} catch (NullPointerException e) {
+				log.warn("reassignMarkerQuotaForDeletedMarkers assignment:" + assignment + " / " + e.getMessage());
+			}
+		}
+	}
+
+	public void reassignDeletedMarkersQuota(Set<AssignmentMarker> assignmentMarkers, AssignmentMarker deletedMarker) {
+		Double reassignQuotaValue = deletedMarker.getQuotaPercentage();
+		Integer reassignMarkerCount = assignmentMarkers.size() - 1;
+		Float reassignValue = new Float(0);
+		Float value = new Float(0);
+		Double reassignValueRemainder = new Double(0);
+		try {
+			if (reassignQuotaValue > 0) {
+				reassignValue = (float) Math.round((reassignQuotaValue / reassignMarkerCount) * 10) / 10;
+				value = reassignValue * reassignMarkerCount;
+				reassignValueRemainder = (double) Math.round((reassignQuotaValue - value) * 10) / 10;
+			}
+			if (reassignMarkerCount > 0) {
+				Iterator<AssignmentMarker> markers = assignmentMarkers.iterator();
+				Boolean remainderUsed = false;
+				while (markers.hasNext()) {
+					AssignmentMarker marker = markers.next();
+					if (marker != deletedMarker) {
+						Double newQuotaValue;
+						if (!remainderUsed) {
+							remainderUsed = true;
+							newQuotaValue = marker.getQuotaPercentage()
+									+ ((double) Math.round((reassignValue + reassignValueRemainder) * 10) / 10);
+						} else {
+							newQuotaValue = marker.getQuotaPercentage()
+									+ ((double) Math.round(reassignValue * 10) / 10);
+						}
+						marker.setQuotaPercentage((double) Math.round(newQuotaValue * 10) / 10);
+						updateAssignmentMarker(marker);
+					} else {
+						marker.setQuotaPercentage(new Double(0));
+						updateAssignmentMarker(marker);
+						if (marker.getNumberUploaded() == 0) {
+							assignmentRepository.deleteAssignmentMarker(marker);
+						}
+					}
+				}
+			}
+		} catch (PermissionException e) {
+			log.error("AssignmentServiceImpl reassignDeletedMarkersQuota updateAssignmentMarker " + e.getMessage());
+		}
+	}
+
+	public Collection<Assignment> findAllAssignmentsForMarkerQuotaCalculation() {
+		return assignmentRepository.findAllAssignmentsForMarkerQuotaCalculation();
+	}
+
+	@Override
+	public boolean markerUpdateResubmission(Assignment assignment, AssignmentSubmission submission) {
+
+		Boolean result = false;
+		AssignmentSubmissionMarker asSM = null;
+		Set<AssignmentMarker> assignmentMarkers = getMarkersForAssignment(assignment);
+		Iterator<AssignmentMarker> asI = assignmentMarkers.iterator();
+
+		while (asI.hasNext()) {
+			AssignmentMarker assignmentMarker = (AssignmentMarker) asI.next();
+			Set<AssignmentSubmissionMarker> assignmentMarkersSubmissions = assignmentMarker.getSubmissionMarkers();
+			Iterator<AssignmentSubmissionMarker> subI = assignmentMarkersSubmissions.iterator();
+			while (subI.hasNext()) {
+				AssignmentSubmissionMarker assignmentSubmissionMarker = (AssignmentSubmissionMarker) subI.next();
+				if (assignmentSubmissionMarker.getAssignmentSubmission().getId().equals(submission.getId())) {
+					asSM = assignmentSubmissionMarker;
+					result = true;
+				}
+				if (result) {
+					break;
+				}
+			}
+			if (result) {
+				break;
+			}
+		}
+
+		if (result) {
+			Boolean downloaded = asSM.getDownloaded();
+			if (downloaded) {
+				asSM.setDownloaded(false);
+
+				try {
+					updateAssignmentSubmissionMarker(asSM, "EVENT_MARKER_ASSIGNMENT_RESUBMISSION");
+				} catch (PermissionException e) {
+					log.error("AssignmentServiceImpl markerUpdateResubmission - updateAssignmentSubmissionMarker "
+							+ e.getMessage());
+				}
+				AssignmentMarker curMarker = asSM.getAssignmentMarker();
+				int downloads = curMarker.getNumberDownloaded() - 1;
+				curMarker.setNumberDownloaded(downloads);
+				try {
+					updateAssignmentMarker(curMarker);
+				} catch (PermissionException e) {
+					log.error("AssignmentServiceImpl markerUpdateResubmission - updateAssignmentMarker "
+							+ e.getMessage());
+				}
+			}
+		}
+		return result;
+	}
 }

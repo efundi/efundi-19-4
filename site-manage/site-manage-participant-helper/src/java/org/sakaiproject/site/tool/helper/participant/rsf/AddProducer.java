@@ -99,7 +99,8 @@ public class AddProducer implements ViewComponentProducer, NavigationCaseReporte
     		UIMessage.make(content, "add.official", "add.official");
     		UIMessage.make(content, "add.official1", "add.official1");
     		UIMessage.make(content, "add.students.instruction1", "add.students.instruction1");
-    		UILink.make(content, "add.students.instruction2", "http://ithelp.nwu.ac.za", "http://ithelp.nwu.ac.za");
+    		String url = handler.getServerConfigurationString("nwu.ithelp.url", "http://ithelp.nwu.ac.za");
+    		UILink.make(content, "add.students.instruction2", url, url);
     		UIMessage.make(content, "add.students.instruction3", "add.students.instruction3");
     		UIMessage.make(content, "add.official.instruction", "add.official.instruction");
 	    }

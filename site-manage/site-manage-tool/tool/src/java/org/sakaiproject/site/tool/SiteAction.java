@@ -2023,7 +2023,12 @@ public class SiteAction extends PagedResourceActionII {
 			context.put("allowUpdateSiteMembership", allowUpdateSiteMembership);
 			context.put("isMyWorkspace", isMyWorkspace);
 			context.put("siteTitle", site.getTitle());
-			context.put("isCourseSite", SiteTypeUtil.isCourseSite(site.getType()));
+			boolean isCourseSite = SiteTypeUtil.isCourseSite(site.getType());
+			context.put("isCourseSite", isCourseSite);
+
+			if(isCourseSite) {
+				context.put("allowStudentEnrolments", Boolean.parseBoolean(site.getProperties().getProperty(Site.PROP_ALLOW_STUDENT_ENROLMENTS)));
+			}
 
 			// Set participant list
 			if (allowUpdateSite || allowViewRoster || allowUpdateSiteMembership) {

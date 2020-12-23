@@ -277,7 +277,7 @@ public class SiteAddParticipantHandler {
                 roles = SiteParticipantHelper.getAllowedRoles( site.getType(), realm.getRoles() );
 
                 ResourcePropertiesEdit rp = site.getPropertiesEdit();                
-                if(!Boolean.parseBoolean(rp.getProperty(Site.PROP_ALLOW_STUDENT_ENROLMENTS))) {
+                if(isCourseSite() && !Boolean.parseBoolean(rp.getProperty(Site.PROP_ALLOW_STUDENT_ENROLMENTS))) {
                 	roles.removeIf(role -> role.getId().equals("Student"));
                 }
             

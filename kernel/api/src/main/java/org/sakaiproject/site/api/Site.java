@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Set;
 
 import org.sakaiproject.authz.api.AuthzGroup;
-import org.sakaiproject.authz.api.Member;
 import org.sakaiproject.entity.api.Edit;
 import org.sakaiproject.time.api.Time;
 import org.sakaiproject.user.api.User;
@@ -74,6 +73,13 @@ public interface Site extends Edit, Comparable, Serializable, AuthzGroup
 	 * property name for custom overview
 	 */
 	public final static String PROP_CUSTOM_OVERVIEW = "custom_overview";
+
+
+	/**
+	 * property name for allow student enrolments
+	 */
+	public final static String PROP_ALLOW_STUDENT_ENROLMENTS = "allow-student-enrolments";
+	
 	/**
 	 * @return the user who created this.
 	 */

@@ -121,6 +121,7 @@
                 <module>webcomponents</module>
                 <module>webjars</module>
                 <module>webservices</module>
+                <module>cm-scheduler-base</module>
             </modules>
         </profile>
         <profile>
@@ -208,6 +209,7 @@
                 <module>webjars</module>
                 <module>webservices</module>
                 <module>yaft</module>
+                <module>cm-scheduler-base</module>
             </modules>
         </profile>
 

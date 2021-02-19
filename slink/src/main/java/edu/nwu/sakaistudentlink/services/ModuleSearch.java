@@ -93,7 +93,7 @@ public class ModuleSearch {
 																				 // value
 				moduleOffering.setModuleSubjectCode(moduleOfferingInfo.getModuleSubjectCode());
 				moduleOffering.setModuleNumber(moduleOfferingInfo.getModuleNumber());
-				moduleOffering.setModuleSite(moduleOfferingInfo.getModuleSite());
+				moduleOffering.setModuleSite(moduleOfferingInfo.getModuleSite().replace("-", ""));
 				moduleOffering.setMethodOfDeliveryTypeKey(moduleOfferingInfo.getMethodOfDeliveryTypeKey());
 				moduleOffering.setModeOfDeliveryTypeKey(moduleOfferingInfo.getModeOfDeliveryTypeKey());
 				moduleOffering.setLanguageTypeKey(moduleOfferingInfo.getLanguageTypeKey());

@@ -14,8 +14,9 @@ public class NWUGradebookRecord {
 	private static final long serialVersionUID = 1L;
 
 	public static final String STATUS_NEW = "NEW";
+	public static final String STATUS_UPDATED = "UPDATED";
 	public static final String STATUS_SUCCESS = "SUCCESS";
-	public static final String STATUS_FAIL = "FAIL";
+	public static final String STATUS_FAIL = "FAILED";
 
 	private Long id;
 

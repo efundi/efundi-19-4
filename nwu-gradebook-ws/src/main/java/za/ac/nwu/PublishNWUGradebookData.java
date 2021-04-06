@@ -5,18 +5,21 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.Map.Entry;
 import java.util.StringTokenizer;
 import java.util.stream.Collectors;
+
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
 
 import ac.za.nwu.academic.dates.dto.AcademicPeriodInfo;
 import ac.za.nwu.common.dto.MetaInfo;
@@ -32,16 +35,40 @@ import assemble.edu.exceptions.InvalidParameterException;
 import assemble.edu.exceptions.MissingParameterException;
 import assemble.edu.exceptions.OperationFailedException;
 import assemble.edu.exceptions.PermissionDeniedException;
-import lombok.extern.slf4j.Slf4j;
 import nwu.student.assesment.service.crud.StudentAssessmentServiceCRUD;
 import nwu.student.assesment.service.crud.factory.StudentAssessmentCRUDServiceClientFactory;
+import nwu.student.assesment.service.dto.MaintainStudentResponseWrapper;
+import nwu.student.assesment.service.dto.StudentMarkInfo;
 
-@Slf4j
+/**
+ * 
+ * @author Joseph Gillman
+ *
+ */
 public class PublishNWUGradebookData {
+	private static final Logger log = LogManager.getLogger(PublishNWUGradebookData.class);
 	
 	private static Connection connection = null;
 	private static PropertiesHolder properties = null;
-
+	private static StudentAssessmentServiceCRUD studentAssessmentServiceCRUDService = null;
+	private static AcademicPeriodInfo academicPeriodInfo = null;
+	private static MetaInfo metaInfo = null;
+	private static ContextInfo contextInfo = new ContextInfo("EFUNDI");
+	private static CourseOfferingService courseOfferingService = null;
+	
+	private final static String CURRENT_YEAR_SITES_SELECT = "SELECT SITE_ID, group_concat(VALUE,'/') as module FROM sakai.sakai_site_group_property WHERE VALUE LIKE ? GROUP BY SITE_ID";
+	
+	private final static String STUDENT_GRDB_MARKS_SELECT = "SELECT gr.STUDENT_ID, gr.POINTS_EARNED, gr.ID, gr.DATE_RECORDED, go.NAME, go.POINTS_POSSIBLE, go.DUE_DATE"
+			+ " FROM gb_grade_record_t gr JOIN gb_gradable_object_t go ON go.ID = gr.GRADABLE_OBJECT_ID JOIN gb_grade_map_t gm ON gm.GRADEBOOK_ID = go.GRADEBOOK_ID JOIN gb_gradebook_t g ON "
+			+ "g.SELECTED_GRADE_MAPPING_ID = gm.ID WHERE g.NAME = ? AND gr.DATE_RECORDED BETWEEN ? AND ? AND go.DUE_DATE IS NOT NULL";		
+	
+	private final static String NWU_GRDB_RECORDS_SELECT = "SELECT * FROM NWU_GRADEBOOK_DATA WHERE SITE_ID = ? AND STUDENT_NUMBER = ? AND GRADABLE_OBJECT_ID = ? AND MODULE = ?";
+	private final static String NWU_GRDB_RECORDS_INSERT = "INSERT INTO NWU_GRADEBOOK_DATA (SITE_ID, SITE_TITLE, MODULE, ASSESSMENT_NAME, STUDENT_NUMBER, EVAL_DESCR_ID, GRADE, "
+			+ "TOTAL_MARK, GRADABLE_OBJECT_ID, RECORDED_DATE, DUE_DATE, CREATED_DATE, STATUS, RETRY_COUNT) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+	private final static String NWU_GRDB_RECORDS_GRADE_UPDATE = "UPDATE NWU_GRADEBOOK_DATA SET GRADE = ?, RECORDED_DATE = ?, MODIFIED_DATE = ?, STATUS = ? WHERE ID = ?";
+	private final static String NWU_GRDB_RECORDS_STATUS_UPDATE = "UPDATE NWU_GRADEBOOK_DATA SET STATUS = ?, MODIFIED_DATE = ?, DESCRIPTION = ? WHERE SITE_ID = ? AND STUDENT_NUMBER = ? AND MODULE = ?";
+	
+	
     public static void main(String args[]) {
     	
         try {
@@ -50,7 +77,7 @@ public class PublishNWUGradebookData {
             
         	LocalDateTime startLocalDateTime = LocalDateTime.parse(args[0]);
         	LocalDateTime endLocalDateTime = LocalDateTime.parse(args[1]);
-            
+        	            
         	properties = new PropertiesHolder();
 
             try {
@@ -59,10 +86,13 @@ public class PublishNWUGradebookData {
             			properties.getPassword());
             	
                 log.info("Database connection successfully made.");
+
+        		boolean initializeSuccess = initializeWebserviceObjects();
+        		if(!initializeSuccess) {
+        			log.error("initializeWebserviceObjects was unsuccessful, please see error log");
+        			return;
+        		}	
         		
-                connection.setAutoCommit(false);
-                //???
-                
                 publishGradebookDataToVSS(startLocalDateTime, endLocalDateTime);
 
                 log.info("Migration complete!");
@@ -72,16 +102,14 @@ public class PublishNWUGradebookData {
                 	connection.close();
                 }
             }
-        } catch (DateTimeParseException  e) {
+        } catch (DateTimeParseException e) {
         	log.error("DateTimeParseException: Please make sure both start & end date paramters has this format: yyyy-MM-ddTHH:mm:ss ie (2021-01-01T12:00:00) ");
         	
         } catch (Exception e) {
-        	log.error("Could not publish Gradebook Data to VSS. ");
-        	
-            throw new RuntimeException(e);
+        	log.error("Could not publish Gradebook Data to VSS. See error log: " + e);
         }
     }
-
+	
     /**
      * 
      * @param startLocalDateTime
@@ -89,58 +117,48 @@ public class PublishNWUGradebookData {
      * @throws SQLException
      */
 	private static void publishGradebookDataToVSS(LocalDateTime startLocalDateTime, LocalDateTime endLocalDateTime) throws SQLException {
+				
 		PreparedStatement currentYearSitesPrepStmt = null;
 		PreparedStatement studentGradebookMarksPrepStmt = null;
 		PreparedStatement nwuGradebookRecordsSelectPrepStmt = null;
-		PreparedStatement nwuGradebookRecordsInsertPrepStmt = null;
-		PreparedStatement nwuGradebookRecordsUpdatePrepStmt = null;
+
 		ResultSet currentYearSitesResultSet = null;
 		ResultSet studentGradebookMarksResultSet = null;
 		ResultSet nwuGradebookRecordsSelectResultSet = null;
-
+		
 		try {
+			
 			// #1 Get all current year sites to process 
-			String currentYearSitesSelectSQL = "SELECT SITE_ID, group_concat(VALUE,'/') as module FROM sakai.sakai_site_group_property WHERE VALUE LIKE ? GROUP BY SITE_ID";
-			currentYearSitesPrepStmt = connection.prepareStatement(currentYearSitesSelectSQL);
-			currentYearSitesPrepStmt.setString(1, "%" + LocalDateTime.now().getYear());
+			currentYearSitesPrepStmt = connection.prepareStatement(CURRENT_YEAR_SITES_SELECT);
+//			currentYearSitesPrepStmt.setString(1, "%" + LocalDateTime.now().getYear());// CHANGE!!!!!! back to current year!!    LocalDateTime.now().getYear()
+			currentYearSitesPrepStmt.setString(1, "%2020");
 			currentYearSitesResultSet = currentYearSitesPrepStmt.executeQuery();
 
-			String siteId, siteTitle, studentNumber, assessmentName = "";
-			Map<String, String> studentGradeMap = null;
+			String siteId, siteTitle, studentNumber, assessmentName = "", evalDescr = "";
+			HashMap<Integer, Double> studentGradeMap = null;
 			double grade, total = 0.0;
+			int evalDescrId;
 			LocalDateTime dueDate = null;
 			LocalDateTime recordedDate = null;
 			List<String> moduleList = null;
-			List<String> moduleValues = null;
-			Calendar calendar = Calendar.getInstance();
-		      
-			int gradableObjectId;
+			List<String> moduleValues = null;		      
 
 			while (currentYearSitesResultSet.next()) {
 				
 				siteId = currentYearSitesResultSet.getString("SITE_ID");
 				siteTitle = getSiteTitle(siteId);
+				int gradableObjectId;// right place ????
 				
 				moduleList = Collections.list(new StringTokenizer(currentYearSitesResultSet.getString("module").replaceAll("/", ""), ",")).stream()
 					      .map(token -> (String) token)
 					      .collect(Collectors.toList());
 				
 				for (String module : moduleList) {
-					moduleValues = Collections.list(new StringTokenizer(module, " ")).stream()
-						      .map(token -> (String) token)
-						      .collect(Collectors.toList());
 					
 					studentGradeMap = new HashMap<>();
 
 					// #2 Get all student numbers and their grades for siteId and the date recorded between start and end date
-					StringBuilder studentGradebookMarksSelectSQL = new StringBuilder("SELECT gr.STUDENT_ID, gr.POINTS_EARNED, gr.ID, gr.DATE_RECORDED, go.NAME, go.POINTS_POSSIBLE, go.DUE_DATE");
-					studentGradebookMarksSelectSQL.append(" FROM gb_grade_record_t gr ");
-					studentGradebookMarksSelectSQL.append("   JOIN gb_gradable_object_t go ON go.ID = gr.GRADABLE_OBJECT_ID");
-					studentGradebookMarksSelectSQL.append("   JOIN gb_grade_map_t gm ON gm.GRADEBOOK_ID = go.GRADEBOOK_ID");
-					studentGradebookMarksSelectSQL.append("   JOIN gb_gradebook_t g ON g.SELECTED_GRADE_MAPPING_ID = gm.ID");
-					studentGradebookMarksSelectSQL.append(" WHERE g.NAME = ?");
-					studentGradebookMarksSelectSQL.append(" AND gr.DATE_RECORDED BETWEEN ? AND ?");
-					studentGradebookMarksPrepStmt = connection.prepareStatement(studentGradebookMarksSelectSQL.toString());
+					studentGradebookMarksPrepStmt = connection.prepareStatement(STUDENT_GRDB_MARKS_SELECT);
 					studentGradebookMarksPrepStmt.setString(1, siteId);
 					studentGradebookMarksPrepStmt.setTimestamp(2, Timestamp.valueOf(startLocalDateTime));
 					studentGradebookMarksPrepStmt.setTimestamp(3, Timestamp.valueOf(endLocalDateTime));
@@ -156,69 +174,51 @@ public class PublishNWUGradebookData {
 						dueDate = studentGradebookMarksResultSet.getTimestamp("DUE_DATE").toLocalDateTime();
 						
 						gradableObjectId = studentGradebookMarksResultSet.getInt("ID");
+
+						//*******************
+						evalDescr = getEvalDesc();
+						evalDescrId = getEvalDescId();
+						evalDescrId = generateEvalDescId();
+						//*******************
 						
 						// #3 Get matching data for students from NWU_GRADEBOOK_DATA
-						String nwuGradebookRecordsSelectSQL = "SELECT * FROM NWU_GRADEBOOK_DATA WHERE SITE_ID = ? AND STUDENT_NUMBER = ? AND GRADABLE_OBJECT_ID = ?";
-						nwuGradebookRecordsSelectPrepStmt = connection.prepareStatement(nwuGradebookRecordsSelectSQL);
+						nwuGradebookRecordsSelectPrepStmt = connection.prepareStatement(NWU_GRDB_RECORDS_SELECT);
 						nwuGradebookRecordsSelectPrepStmt.setString(1, siteId);
 						nwuGradebookRecordsSelectPrepStmt.setString(2, studentNumber);
 						nwuGradebookRecordsSelectPrepStmt.setInt(3, gradableObjectId);
-						nwuGradebookRecordsSelectResultSet = nwuGradebookRecordsSelectPrepStmt.executeQuery();				
-						if(nwuGradebookRecordsSelectResultSet.getMetaData().getColumnCount() == 0) {
+						nwuGradebookRecordsSelectPrepStmt.setString(4, module);
+//						nwuGradebookRecordsSelectPrepStmt.setInt(5, evalDescrId);
+						nwuGradebookRecordsSelectResultSet = nwuGradebookRecordsSelectPrepStmt.executeQuery();
+						
+						if (nwuGradebookRecordsSelectResultSet.next()) {
+				            do {
+				            	int id = nwuGradebookRecordsSelectResultSet.getInt("ID");
+								double existingGrade = nwuGradebookRecordsSelectResultSet.getDouble("GRADE");							
+								LocalDateTime existingRecordedDate = nwuGradebookRecordsSelectResultSet.getTimestamp("RECORDED_DATE").toLocalDateTime();	
+								
+								// #5 If the grade and recordedDate differ, update NWU_GRADEBOOK_DATA record and add to map for WS
+								if (existingGrade != grade || (existingRecordedDate != null && !existingRecordedDate.isEqual(recordedDate))) {
+									
+									updateNWUGradebookData(studentNumber, studentGradeMap, grade, recordedDate, id);
+								}
+				            } while (nwuGradebookRecordsSelectResultSet.next());
+				        } else {
 
 							// #4 If the record does not exist in NWU_GRADEBOOK_DATA, insert new with status STATUS_NEW
-							String nwuGradebookRecordsInsertSQL = "INSERT INTO NWU_GRADEBOOK_DATA VALUES (default,?,?,?,?,?,?,?)";
-							nwuGradebookRecordsInsertPrepStmt = connection.prepareStatement(nwuGradebookRecordsInsertSQL, Statement.RETURN_GENERATED_KEYS);
-							nwuGradebookRecordsInsertPrepStmt.setString(1, siteId);
-							nwuGradebookRecordsInsertPrepStmt.setString(2, studentNumber);
-							nwuGradebookRecordsInsertPrepStmt.setDouble(3, grade);
-							nwuGradebookRecordsInsertPrepStmt.setInt(4, gradableObjectId);						
-
-						    java.sql.Date startDate = new java.sql.Date(calendar.getTime().getTime());
-							nwuGradebookRecordsInsertPrepStmt.setDate(5, startDate);
-							nwuGradebookRecordsInsertPrepStmt.setString(6, NWUGradebookRecord.STATUS_NEW);
-							nwuGradebookRecordsInsertPrepStmt.setInt(7, 0);							
-							
-						    // execute the preparedstatement
-							int count = nwuGradebookRecordsInsertPrepStmt.executeUpdate();
-							if(count > 0) {
-								// If inserted successfully, add student and grade data to Map
-								studentGradeMap.put(studentNumber, String.valueOf(grade));
-							}
-
-						} else { 
-							
-							//If it does exist by grade and recordedDate differ, update with new values and Status = UPDATE
-							
-//							if (studentGradebookMarksResultSet.next()) {
-//								studentNumber = currentYearSitesResultSet.getString("STUDENT_ID");
-//								grade = currentYearSitesResultSet.getDouble("POINTS_EARNED");
-//								gradableObjectId = currentYearSitesResultSet.getInt("ID");
-//								dateRecorde
-							
-//							}
-
-							//Send via http://workflow7tst.nwu.ac.za/student-assessment-v4-v_test/StudentAssessmentServiceCRUD/StudentAssessmentServiceCRUD?wsdl
-							
-							//IF WS update was successful, update status in new table to DONE, else update status to FAIL / RETRY
-						}
-						
-						//if not exist in new table, insert
-						
-						//else, if it does exist in table, 
-						
-						//Read new table, if status is != DONE, and between START and END DATE, and siteId, studentNumber, 
-						
-						
-						
-						//new table ID, SITE_ID, STUDENT_NUMBER, GRADE, GRADABLE_OBJECT_ID, CREATED_DATE, MODIFIED_DATE, STATUS, RETRY_COUNT, DESCRIPTION
-						
+							insertNWUGradebookData(siteId, siteTitle, studentNumber, assessmentName, studentGradeMap, grade, total, evalDescrId, dueDate,
+									recordedDate, gradableObjectId, module);
+				        }										
 					}
 					
+					if(!studentGradeMap.isEmpty()) {
 
-					// #5 If the INSERT was successful and studentGradeMap not empty, send student grades/data via Webservice StudentAssessmentServiceCRUD
-					publishGrades(moduleValues, studentGradeMap, siteTitle, assessmentName, total, dueDate, recordedDate);
-					
+						moduleValues = Collections.list(new StringTokenizer(module, " ")).stream()
+							      .map(token -> (String) token)
+							      .collect(Collectors.toList());
+						
+						// #6 If the INSERT was successful and studentGradeMap not empty, send student grades/data via Webservice StudentAssessmentServiceCRUD
+						publishGrades(siteId, module, moduleValues, studentGradeMap, siteTitle, assessmentName, evalDescr, total, dueDate, recordedDate);						
+					}				
 				}				
 			}
 		} finally {
@@ -230,11 +230,280 @@ public class PublishNWUGradebookData {
             if (currentYearSitesPrepStmt != null) { currentYearSitesPrepStmt.close(); }
             if (studentGradebookMarksPrepStmt != null) { studentGradebookMarksPrepStmt.close(); }
             if (nwuGradebookRecordsSelectPrepStmt != null) { nwuGradebookRecordsSelectPrepStmt.close(); }
-            if (nwuGradebookRecordsInsertPrepStmt != null) { nwuGradebookRecordsInsertPrepStmt.close(); }
-            if (nwuGradebookRecordsUpdatePrepStmt != null) { nwuGradebookRecordsUpdatePrepStmt.close(); }
 		}
 	}
 
+	/**
+	 * 
+	 * @param studentNumber
+	 * @param studentGradeMap
+	 * @param grade
+	 * @param recordedDate
+	 * @param id
+	 */
+	private static void updateNWUGradebookData(String studentNumber, HashMap<Integer, Double> studentGradeMap, double grade, LocalDateTime recordedDate, int id){
+		
+		PreparedStatement nwuGradebookRecordsUpdatePrepStmt = null;
+		try {
+			nwuGradebookRecordsUpdatePrepStmt = connection.prepareStatement(NWU_GRDB_RECORDS_GRADE_UPDATE);
+			nwuGradebookRecordsUpdatePrepStmt.setDouble(1, grade);
+			nwuGradebookRecordsUpdatePrepStmt.setTimestamp(2, Timestamp.valueOf(recordedDate));
+			nwuGradebookRecordsUpdatePrepStmt.setTimestamp(3, Timestamp.valueOf(LocalDateTime.now()));
+			nwuGradebookRecordsUpdatePrepStmt.setString(4, NWUGradebookRecord.STATUS_UPDATED);
+			nwuGradebookRecordsUpdatePrepStmt.setInt(5, id);
+			
+			// execute the preparedstatement
+			int count = nwuGradebookRecordsUpdatePrepStmt.executeUpdate();
+			
+			if(count > 0) {
+				// If Updated successfully, add student and grade data to Map
+				studentGradeMap.put(Integer.parseInt(studentNumber), grade);
+
+                log.debug("Updated NWU_GRADEBOOK_DATA - ID = " + id + ", GRADE = " + grade);
+			}
+		} catch (SQLException e) {
+			log.error("Could not update NWU Gradebook data: ", e);
+		}
+	}
+
+	/**
+	 * 
+	 * @param siteId
+	 * @param siteTitle
+	 * @param studentNumber
+	 * @param assessmentName
+	 * @param studentGradeMap
+	 * @param grade
+	 * @param total
+	 * @param evalDescrId
+	 * @param dueDate
+	 * @param recordedDate
+	 * @param gradableObjectId
+	 * @param module
+	 */
+	private static void insertNWUGradebookData(String siteId, String siteTitle,
+			String studentNumber, String assessmentName, HashMap<Integer, Double> studentGradeMap, double grade, double total,
+			int evalDescrId, LocalDateTime dueDate, LocalDateTime recordedDate, int gradableObjectId, String module) {
+		
+		PreparedStatement nwuGradebookRecordsInsertPrepStmt = null;
+		try {
+			nwuGradebookRecordsInsertPrepStmt = connection.prepareStatement(NWU_GRDB_RECORDS_INSERT);
+
+			nwuGradebookRecordsInsertPrepStmt.setString(1, siteId);
+			nwuGradebookRecordsInsertPrepStmt.setString(2, siteTitle);
+			nwuGradebookRecordsInsertPrepStmt.setString(3, module);
+			nwuGradebookRecordsInsertPrepStmt.setString(4, assessmentName);					
+			nwuGradebookRecordsInsertPrepStmt.setString(5, studentNumber);
+			nwuGradebookRecordsInsertPrepStmt.setInt(6, evalDescrId);
+			nwuGradebookRecordsInsertPrepStmt.setDouble(7, grade);
+			nwuGradebookRecordsInsertPrepStmt.setDouble(8, total);
+			nwuGradebookRecordsInsertPrepStmt.setInt(9, gradableObjectId);
+			nwuGradebookRecordsInsertPrepStmt.setTimestamp(10, Timestamp.valueOf(recordedDate));
+			nwuGradebookRecordsInsertPrepStmt.setTimestamp(11, Timestamp.valueOf(dueDate));	
+			nwuGradebookRecordsInsertPrepStmt.setTimestamp(12, Timestamp.valueOf(LocalDateTime.now()));							
+			nwuGradebookRecordsInsertPrepStmt.setString(13, NWUGradebookRecord.STATUS_NEW);
+			nwuGradebookRecordsInsertPrepStmt.setInt(14, 0);
+			
+			// execute the preparedstatement
+			int count = nwuGradebookRecordsInsertPrepStmt.executeUpdate();			
+			if(count > 0) {
+				// If inserted successfully, add student and grade data to Map
+				studentGradeMap.put(Integer.parseInt(studentNumber), grade);
+
+                log.debug("Inserted NWU_GRADEBOOK_DATA - siteId = " + siteId + ", module = " + module + ", assessmentName = " + assessmentName + ", studentNumber = " + studentNumber + ", grade = " + grade);
+			}
+		} catch (SQLException e) {
+			log.error("Could not insert NWU Gradebook data for: siteId: " + siteId + "; module: " + module + "; studentNumber: " + studentNumber + "; assessmentName: " + assessmentName, e);
+		}
+	}
+
+	/**
+	 * 
+	 * @param siteId 
+	 * @param module 
+	 * @param moduleValues
+	 * @param studentGradeMap
+	 * @param siteTitle
+	 * @param assessmentName
+	 * @param evalDescr
+	 * @param total
+	 * @param dueDate
+	 * @param recordedDate
+	 */
+	private static void publishGrades(String siteId, String module, List<String> moduleValues, HashMap<Integer, Double> studentGradeMap, String siteTitle, String assessmentName, String evalDescr,
+			double total, LocalDateTime dueDate, LocalDateTime recordedDate)  {
+
+		log.info("publishGrades start: ");
+
+        String strValue = moduleValues.get(2);
+        int indexOf = strValue.indexOf("-");
+		String enrolmentCategoryTypeKey = "vss.code.ENROLCAT." + strValue.substring(0, indexOf);
+		String modeOfDeliveryTypeKey = "vss.code.PRESENTCAT." + strValue.substring(indexOf + 1);
+		
+		String moduleSite = Campus.getNumber(moduleValues.get(3));
+		ModuleOfferingInfo moduleOfferingInfo = getModuleOfferingInfo(academicPeriodInfo, moduleValues.get(0), moduleValues.get(1), moduleSite, enrolmentCategoryTypeKey, modeOfDeliveryTypeKey, contextInfo);
+        
+		if(moduleOfferingInfo == null) {
+			log.error("Grades could not be published, see error log for siteTitle: " + siteTitle + "; assessmentName: " + assessmentName);
+			log.error("Could not find ModuleOfferingInfo, see error log for subjectCode: " + moduleValues.get(0) + "; moduleNumber: " + moduleValues.get(1) + 
+					"; moduleSite: " + moduleSite + "; enrolmentCategoryTypeKey: " + enrolmentCategoryTypeKey + "; modeOfDeliveryTypeKey: " + modeOfDeliveryTypeKey);
+			return;
+		}
+		
+		StudentMarkInfo studentMarkInfo = new StudentMarkInfo();
+		studentMarkInfo.setModuleSubjectCode(moduleValues.get(0));
+		studentMarkInfo.setModuleNumber(moduleValues.get(1));
+		studentMarkInfo.setAcademicPeriod(academicPeriodInfo);
+		studentMarkInfo.setEnrolmentCategoryTypeKey(enrolmentCategoryTypeKey);
+		studentMarkInfo.setModeOfDeliveryTypeKey(modeOfDeliveryTypeKey);
+		studentMarkInfo.setTermTypeKey(moduleOfferingInfo.getTermTypeKey());
+		studentMarkInfo.setModuleOrgEnt(Integer.parseInt(moduleOfferingInfo.getModuleOrgEnt()));
+		studentMarkInfo.setModuleSite(Integer.parseInt(moduleSite));
+		studentMarkInfo.setClassGroupDescription(siteTitle);
+		studentMarkInfo.setLanguageTypeKey("vss.code.LANGUAGE.2");
+		studentMarkInfo.setEvaluationDesc(assessmentName);
+		studentMarkInfo.setEvaluationShortDesc(evalDescr);
+		studentMarkInfo.setEvaluationCutOffDate(Date.from(dueDate.atZone(ZoneId.systemDefault()).toInstant()));
+		studentMarkInfo.setEvaluationMarkOutOff((int) total);
+		studentMarkInfo.setEvaluationNoOfSubmissions(1);
+		studentMarkInfo.setEvaluationSubminimum(0);
+		studentMarkInfo.setEvaluationAssessmentDateTime(Date.from(recordedDate.atZone(ZoneId.systemDefault()).toInstant()));
+		studentMarkInfo.setEvaluationIsRequiredForExam(true);
+		studentMarkInfo.setStudentAndMark(studentGradeMap);
+		studentMarkInfo.setMetaInfo(metaInfo);
+
+//		MaintainStudentResponseWrapper result = null;
+		try {
+			MaintainStudentResponseWrapper result = studentAssessmentServiceCRUDService.maintainStudentMark(studentMarkInfo, contextInfo);
+			HashMap<String, String> maintainStudentResponse = result.getMaintainStudentResponse();
+			if(maintainStudentResponse == null) {
+				log.error("Response from publishGrades is empty for siteId: " + siteId + "; siteTitle: " + siteTitle + "; module: " + module + "; assessmentName: " + assessmentName + "; studentGradeMap: " + studentGradeMap);
+			} else {
+				updateNWUGradebookRecords(siteId, module, maintainStudentResponse);
+			}				
+				
+		} catch (DoesNotExistException | InvalidParameterException | MissingParameterException
+				| OperationFailedException | PermissionDeniedException e) {
+			log.error("Grades could not be published, see error log for siteTitle: " + siteTitle + "; assessmentName: " + assessmentName, e);
+		} catch (Exception e) {
+			log.error("Grades could not be published, see error log for siteTitle: " + siteTitle + "; assessmentName: " + assessmentName, e);
+        }
+
+		log.info("publishGrades end: ");
+	}
+
+	/**
+	 * 
+	 * @param siteId
+	 * @param module
+	 * @param maintainStudentResponse
+	 */
+	private static void updateNWUGradebookRecords(String siteId, String module, HashMap<String, String> maintainStudentResponse) {
+		
+		PreparedStatement nwuGradebookRecordsUpdateStatusPrepStmt = null;
+		for (Entry<String, String> entry : maintainStudentResponse.entrySet()) {
+			String studentNumber = entry.getKey();
+			String resultValue = entry.getValue();
+			boolean success = false;
+			log.debug("updateNWUGradebookRecords - studentNumber: " + studentNumber + " resultValue: " + resultValue);
+
+			// #6 IF WS update was successful, update status in new table to DONE, else update status to FAIL / RETRY
+			if(resultValue != null && resultValue.equals("Create or Update of student mark successful")) {
+				success = true;
+			}
+
+			try {
+				nwuGradebookRecordsUpdateStatusPrepStmt = connection.prepareStatement(NWU_GRDB_RECORDS_STATUS_UPDATE);
+
+				// if WS success / else status = FAIL with description
+				if(success) {
+					nwuGradebookRecordsUpdateStatusPrepStmt.setString(1, NWUGradebookRecord.STATUS_SUCCESS);
+					nwuGradebookRecordsUpdateStatusPrepStmt.setTimestamp(2, Timestamp.valueOf(LocalDateTime.now()));
+					nwuGradebookRecordsUpdateStatusPrepStmt.setString(3, null);
+				} else {
+					nwuGradebookRecordsUpdateStatusPrepStmt.setString(1, NWUGradebookRecord.STATUS_FAIL);
+					nwuGradebookRecordsUpdateStatusPrepStmt.setTimestamp(2, Timestamp.valueOf(LocalDateTime.now()));
+					nwuGradebookRecordsUpdateStatusPrepStmt.setString(3, resultValue);
+				}
+
+				nwuGradebookRecordsUpdateStatusPrepStmt.setString(4, siteId);
+				nwuGradebookRecordsUpdateStatusPrepStmt.setString(5, studentNumber);
+				nwuGradebookRecordsUpdateStatusPrepStmt.setString(6, module);
+
+				// execute the preparedstatement
+				nwuGradebookRecordsUpdateStatusPrepStmt.executeUpdate();
+				
+		        log.debug("Published NWU Student data & updated NWU_GRADEBOOK_DATA - siteId = " + siteId + ", module = " + module + ", studentNumber = " + studentNumber);
+			} catch (SQLException e) {
+				log.error("Could not update NWU Gradebook data for: siteId: " + siteId + "; studentNumber: " + studentNumber
+						+ "; module: " + module, e);
+			}
+		}
+	}
+
+	/**
+	 * 
+	 * @param academicPeriodInfo
+	 * @param subjectCode
+	 * @param moduleNumber
+	 * @param moduleSite
+	 * @param enrolmentCategoryTypeKey
+	 * @param modeOfDeliveryTypeKey
+	 * @param contextInfo
+	 * @return
+	 */
+	private static ModuleOfferingInfo getModuleOfferingInfo(AcademicPeriodInfo academicPeriodInfo, String subjectCode, String moduleNumber, String moduleSite, String enrolmentCategoryTypeKey, String modeOfDeliveryTypeKey, ContextInfo contextInfo) {
+			
+		ModuleOfferingSearchCriteriaInfo searchCriteria = new ModuleOfferingSearchCriteriaInfo();
+		searchCriteria.setAcademicPeriod(academicPeriodInfo);
+		searchCriteria.setModuleSubjectCode(subjectCode);
+		searchCriteria.setModuleNumber(moduleNumber);
+		searchCriteria.setModuleSite(moduleSite);
+		searchCriteria.setMethodOfDeliveryTypeKey(enrolmentCategoryTypeKey);
+		searchCriteria.setModeOfDeliveryTypeKey(modeOfDeliveryTypeKey);
+		
+		try {
+			List<ModuleOfferingInfo> moduleOfferingList = courseOfferingService
+					.getModuleOfferingBySearchCriteria(searchCriteria, "vss.code.LANGUAGE.2", contextInfo);
+
+			if(moduleOfferingList != null && !moduleOfferingList.isEmpty()) {
+				return moduleOfferingList.get(0);
+			}
+			
+		} catch (DoesNotExistException | InvalidParameterException | MissingParameterException
+				| OperationFailedException | PermissionDeniedException e) {
+			log.error("Could not find ModuleOfferingInfo, see error log for subjectCode: " + subjectCode + "; moduleNumber: " + moduleNumber + 
+					"; moduleSite: " + moduleSite + "; enrolmentCategoryTypeKey: " + enrolmentCategoryTypeKey + "; modeOfDeliveryTypeKey: " + modeOfDeliveryTypeKey, e);
+		} catch (Exception e) {
+			log.error("Could not find ModuleOfferingInfo, see error log for subjectCode: " + subjectCode + "; moduleNumber: " + moduleNumber + 
+					"; moduleSite: " + moduleSite + "; enrolmentCategoryTypeKey: " + enrolmentCategoryTypeKey + "; modeOfDeliveryTypeKey: " + modeOfDeliveryTypeKey, e);
+        }
+
+		return null;
+	}
+
+	private static String getEvalDesc() {
+		// TODO Auto-generated method stub
+		return "TEST1";
+	}
+
+	private static int getEvalDescId() {
+		
+//		RandomStringUtils.
+		return 1;
+	}
+	
+	private static int generateEvalDescId() {
+//		RandomStringUtils.
+		return 1;
+	}
+
+	/**
+	 * 
+	 * @param siteId
+	 * @return
+	 * @throws SQLException
+	 */
 	private static String getSiteTitle(String siteId) throws SQLException {
 
 		String siteTitleSelectSQL = "SELECT TITLE FROM sakai.sakai_site where SITE_ID = ?";
@@ -247,108 +516,67 @@ public class PublishNWUGradebookData {
 		return null;
 	}
 
-	private static void publishGrades(List<String> moduleValues, Map<String, String> studentGradeMap, String siteTitle, String assessmentName, double total, LocalDateTime dueDate, LocalDateTime recordedDate) {
 
-		log.info("publishGrades start: ");
+	/**
+	 * 
+	 * @return
+	 */
+	private static boolean initializeWebserviceObjects() {
+		if(academicPeriodInfo == null) {
+			Calendar calendar = Calendar.getInstance();	
+			academicPeriodInfo = new AcademicPeriodInfo();
+			academicPeriodInfo.setAcadPeriodtTypeKey("vss.code.AcademicPeriod.YEAR");
+			academicPeriodInfo.setAcadPeriodValue(Integer.toString(calendar.get(Calendar.YEAR)));
+		}
 		
-		Calendar calendar = Calendar.getInstance();	
-		AcademicPeriodInfo academicPeriodInfo = new AcademicPeriodInfo();
-		academicPeriodInfo.setAcadPeriodtTypeKey("vss.code.AcademicPeriod.YEAR");
-		academicPeriodInfo.setAcadPeriodValue(Integer.toString(calendar.get(Calendar.YEAR)));
-		ContextInfo contextInfo = new ContextInfo("SOAPUI");//EFUNDI
+		if (metaInfo == null) {
+			metaInfo = new MetaInfo();
+			metaInfo.setCreateId(properties.getWSMetaInfoCreateId());
+			metaInfo.setAuditFunction(properties.getWSMetaInfoAuditFunction());
+		}
 		
-		MetaInfo metaInfo = new MetaInfo();
-		metaInfo.setCreateId(properties.getWSMetaInfoCreateId());
-		metaInfo.setAuditFunction(properties.getWSMetaInfoAuditFunction());
-		
-//		String wsMajorVersion = ServiceRegistryLookupUtility.getMajorVersion(version);???????????
-		String wsMajorVersion = properties.getWSMajorVersion();
-		String database = properties.getWSDatabase();
-		String runtimeEnvironment = properties.getWSRuntimeEnvironment();
-		String username = properties.getWSUsername();
-		String password = properties.getWSPassword();
-		
-		String studentServiceLookupKey = ServiceRegistryLookupUtility.getServiceRegistryLookupKey(
-                StudentAssessmentCRUDServiceClientFactory.STUDENTASSESSMENTCRUDSERVICE, wsMajorVersion, database,
-                runtimeEnvironment);
+		if(studentAssessmentServiceCRUDService == null) {
+			String studentServiceLookupKey = ServiceRegistryLookupUtility.getServiceRegistryLookupKey(properties.getWSRuntimeEnvironment(),
+	                StudentAssessmentCRUDServiceClientFactory.STUDENTASSESSMENTCRUDSERVICE, properties.getWSMajorVersion(), properties.getWSDatabase());
 
-        StudentAssessmentServiceCRUD service = (StudentAssessmentServiceCRUD) GenericServiceClientFactory.getService(
-                studentServiceLookupKey, username, password, StudentAssessmentServiceCRUD.class);
-
-        String strValue = moduleValues.get(2);
-        int indexOf = strValue.indexOf("-");
-		String enrolmentCategoryTypeKey = "vss.code.ENROLCAT." + strValue.substring(0, indexOf);
-		String modeOfDeliveryTypeKey = "vss.code.PRESENTCAT." + strValue.substring(indexOf + 1);
-		
-		String moduleSite = Campus.getNumber(moduleValues.get(3));
-		ModuleOfferingInfo moduleOfferingInfo = getModuleOfferingInfo(academicPeriodInfo, moduleValues.get(0), moduleValues.get(1), moduleSite, enrolmentCategoryTypeKey, modeOfDeliveryTypeKey, contextInfo);
-        
-		HashMap<String, String> result = service.maintainStudentMark(moduleValues.get(0), moduleValues.get(1), academicPeriodInfo, enrolmentCategoryTypeKey, 
-        		modeOfDeliveryTypeKey, moduleOfferingInfo.getTermTypeKey(), moduleOfferingInfo.getModuleOrgEnt(), moduleSite, siteTitle, "vss.code.LANGUAGE.3", assessmentName, evaluationShortDesc, 
-        		dueDate, total, 1, 0, recordedDate, 1, studentGradeMap, metaInfo, contextInfo);
-		
-		updateNWUGradebookRecords();
-
-		log.info("publishGrades end: ");
-	}
-
-	private static void updateNWUGradebookRecords() {
-
-		// #6 IF WS update was successful, update status in new table to DONE, else update status to FAIL / RETRY
-		String nwuGradebookRecordsUpdateSQL = "UPDATE NWU_GRADEBOOK_DATA SET MODIFIED_DATE = ?, STATUS = ? WHERE SITE_ID = ? AND STUDENT_NUMBER = ? AND GRADABLE_OBJECT_ID = ?";
-//		nwuGradebookRecordsUpdatePrepStmt = connection.prepareStatement(nwuGradebookRecordsUpdateSQL);
-//	    java.sql.Date modifiedDate = new java.sql.Date(calendar.getTime().getTime());
-//	    nwuGradebookRecordsUpdatePrepStmt.setDate(1, modifiedDate);
-//		
-//		//if WS success / else status = FAIL
-//		nwuGradebookRecordsUpdatePrepStmt.setString(2, NWUGradebookRecord.STATUS_SUCCESS);
-//		nwuGradebookRecordsUpdatePrepStmt.setString(3, siteId);
-//		nwuGradebookRecordsUpdatePrepStmt.setString(4, studentNumber);
-//		nwuGradebookRecordsUpdatePrepStmt.setInt(5, gradableObjectId);
-//		
-//	    // execute the preparedstatement
-//		nwuGradebookRecordsUpdatePrepStmt.executeUpdate();
-	}
-
-	private static ModuleOfferingInfo getModuleOfferingInfo(AcademicPeriodInfo academicPeriodInfo, String subjectCode, String moduleNumber, String moduleSite, String enrolmentCategoryTypeKey, String modeOfDeliveryTypeKey, ContextInfo contextInfo) {
-		
-		String envTypeKey = properties.getWSModuleEnvTypeKey();
-		String contextInfoUsername = properties.getNWUContextInfoUsername();
-		String contextInfoPassword = properties.getNWUContextInfoPassword();
-		
-		ModuleOfferingSearchCriteriaInfo searchCriteria = new ModuleOfferingSearchCriteriaInfo();
-		searchCriteria.setAcademicPeriod(academicPeriodInfo);
-		searchCriteria.setModuleSubjectCode(subjectCode);
-		searchCriteria.setModuleNumber(moduleNumber);
-		searchCriteria.setModuleSite(moduleSite);
-		searchCriteria.setMethodOfDeliveryTypeKey(enrolmentCategoryTypeKey);
-		searchCriteria.setModeOfDeliveryTypeKey(modeOfDeliveryTypeKey);		
-		
-		CourseOfferingService courseOfferingService;
-		try {
-			courseOfferingService = (CourseOfferingService) CourseOfferingServiceClientFactory
-					.getCourseOfferingService(envTypeKey, contextInfoUsername, contextInfoPassword);
-
-			List<ModuleOfferingInfo> moduleOfferingList = courseOfferingService
-					.getModuleOfferingBySearchCriteria(searchCriteria, "vss.code.LANGUAGE.3", contextInfo);
-
-			if(moduleOfferingList != null && !moduleOfferingList.isEmpty()) {
-				return moduleOfferingList.get(0);
+			try {
+				studentAssessmentServiceCRUDService = (StudentAssessmentServiceCRUD) GenericServiceClientFactory.getService(
+				        studentServiceLookupKey, properties.getWSUsername(), properties.getWSPassword(), StudentAssessmentServiceCRUD.class);
+			} catch (PermissionDeniedException e) {
+				log.error("initializeWebserviceObjects - Initializing StudentAssessmentServiceCRUD failed with PermissionDeniedException: ", e);
+				return false;
+			} catch (DoesNotExistException e) {
+				log.error("initializeWebserviceObjects - Initializing StudentAssessmentServiceCRUD failed with DoesNotExistException: ", e);
+				return false;
+			} catch (MissingParameterException e) {
+				log.error("initializeWebserviceObjects - Initializing StudentAssessmentServiceCRUD failed with MissingParameterException: ", e);
+			} catch (OperationFailedException e) {
+				log.error("initializeWebserviceObjects - Initializing StudentAssessmentServiceCRUD failed with OperationFailedException: ", e);
+				return false;
 			}
-			
-		}  catch (InvalidParameterException e) {
-			log.error("OfferingTracsService - InvalidParameter: ", e);
-		} catch (DoesNotExistException e) {
-			log.error("OfferingTracsService - DoesNotExist: ", e);
-		} catch (OperationFailedException e) {
-			log.error("OfferingTracsService - OperationFailed: ", e);
-		} catch (MissingParameterException e) {
-			log.error("OfferingTracsService - MissingParameter: ", e);
-		} catch (PermissionDeniedException e) {
-			log.error("OfferingTracsService - PermissionDenied: ", e);
-		} 
+		}
+		
+		if (courseOfferingService == null) {
+			try {
+				courseOfferingService = (CourseOfferingService) CourseOfferingServiceClientFactory
+						.getCourseOfferingService(properties.getWSModuleEnvTypeKey(), properties.getNWUContextInfoUsername(), properties.getNWUContextInfoPassword());
+			} catch (PermissionDeniedException e) {
+				log.error("initializeWebserviceObjects - Initializing CourseOfferingService failed with PermissionDeniedException: ", e);
+				return false;
+			} catch (DoesNotExistException e) {
+				log.error("initializeWebserviceObjects - Initializing CourseOfferingService failed with DoesNotExistException: ", e);
+				return false;
+			} catch (MissingParameterException e) {
+				log.error("initializeWebserviceObjects - Initializing CourseOfferingService failed with MissingParameterException: ", e);
+				return false;
+			} catch (OperationFailedException e) {
+				log.error("initializeWebserviceObjects - Initializing CourseOfferingService failed with OperationFailedException: ", e);
+				return false;
+			}
+		}
 
-		return null;
+        log.info("Initializing Webservice Objects was successful.");
+		return true;
 	}
 
 	private static void showUsage() {

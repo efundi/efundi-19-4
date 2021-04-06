@@ -23,17 +23,25 @@ public class NWUGradebookRecord {
 	@EqualsAndHashCode.Include
     private String siteId;
 
+    private String siteTitle;
+    private String module;
+    private String assessmentName;
+    
 	@EqualsAndHashCode.Include
     private String studentNumber;
 
+    private int evalDescrId;
+
 	@EqualsAndHashCode.Include
     private double grade;
+    private double totalMark;
 
 	@EqualsAndHashCode.Include
     private int gradableObjectId;
 
-    private Date createdDate;
-    
+    private Date recordedDate;
+    private Date dueDate;
+    private Date createdDate;    
     private Date modifiedDate;
 
 	@EqualsAndHashCode.Include

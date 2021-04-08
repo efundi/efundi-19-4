@@ -130,8 +130,7 @@ public class PublishNWUGradebookData {
 			
 			// #1 Get all current year sites to process 
 			currentYearSitesPrepStmt = connection.prepareStatement(CURRENT_YEAR_SITES_SELECT);
-//			currentYearSitesPrepStmt.setString(1, "%" + LocalDateTime.now().getYear());// CHANGE!!!!!! back to current year!!    LocalDateTime.now().getYear()
-			currentYearSitesPrepStmt.setString(1, "%2020");
+			currentYearSitesPrepStmt.setString(1, "%" + LocalDateTime.now().getYear());
 			currentYearSitesResultSet = currentYearSitesPrepStmt.executeQuery();
 
 			String siteId, siteTitle, studentNumber, assessmentName = "", evalDescr = "";
@@ -333,7 +332,15 @@ public class PublishNWUGradebookData {
 	private static void publishGrades(String siteId, String module, List<String> moduleValues, HashMap<Integer, Double> studentGradeMap, String siteTitle, String assessmentName, String evalDescr,
 			double total, LocalDateTime dueDate, LocalDateTime recordedDate)  {
 
-		log.info("publishGrades start: ");
+		log.info("publishGrades start");
+		log.info("		siteId = " + siteId);
+		log.info("		module = " + module);
+		log.info("		studentGradeMap = " + studentGradeMap);
+		log.info("		assessmentName = " + assessmentName);
+		log.info("		evalDescr = " + evalDescr);
+		log.info("		total = " + total);
+		log.info("		dueDate = " + dueDate);
+		log.info("		recordedDate = " + recordedDate);
 
         String strValue = moduleValues.get(2);
         int indexOf = strValue.indexOf("-");
@@ -372,24 +379,30 @@ public class PublishNWUGradebookData {
 		studentMarkInfo.setStudentAndMark(studentGradeMap);
 		studentMarkInfo.setMetaInfo(metaInfo);
 
-//		MaintainStudentResponseWrapper result = null;
 		try {
 			MaintainStudentResponseWrapper result = studentAssessmentServiceCRUDService.maintainStudentMark(studentMarkInfo, contextInfo);
+
 			HashMap<String, String> maintainStudentResponse = result.getMaintainStudentResponse();
 			if(maintainStudentResponse == null) {
 				log.error("Response from publishGrades is empty for siteId: " + siteId + "; siteTitle: " + siteTitle + "; module: " + module + "; assessmentName: " + assessmentName + "; studentGradeMap: " + studentGradeMap);
+
+				updateNWUGradebookRecordsWithStatus(siteId, module, studentGradeMap, NWUGradebookRecord.STATUS_FAIL, "MaintainStudentResponse is null");
 			} else {
 				updateNWUGradebookRecords(siteId, module, maintainStudentResponse);
-			}				
+			}
 				
 		} catch (DoesNotExistException | InvalidParameterException | MissingParameterException
 				| OperationFailedException | PermissionDeniedException e) {
 			log.error("Grades could not be published, see error log for siteTitle: " + siteTitle + "; assessmentName: " + assessmentName, e);
+			
+			updateNWUGradebookRecordsWithStatus(siteId, module, studentGradeMap, NWUGradebookRecord.STATUS_FAIL, e.getMessage());
 		} catch (Exception e) {
 			log.error("Grades could not be published, see error log for siteTitle: " + siteTitle + "; assessmentName: " + assessmentName, e);
+
+			updateNWUGradebookRecordsWithStatus(siteId, module, studentGradeMap, NWUGradebookRecord.STATUS_FAIL, e.getMessage());
         }
 
-		log.info("publishGrades end: ");
+		log.info("publishGrades end");
 	}
 
 	/**
@@ -401,6 +414,7 @@ public class PublishNWUGradebookData {
 	private static void updateNWUGradebookRecords(String siteId, String module, HashMap<String, String> maintainStudentResponse) {
 		
 		PreparedStatement nwuGradebookRecordsUpdateStatusPrepStmt = null;
+		
 		for (Entry<String, String> entry : maintainStudentResponse.entrySet()) {
 			String studentNumber = entry.getKey();
 			String resultValue = entry.getValue();
@@ -438,6 +452,39 @@ public class PublishNWUGradebookData {
 				log.error("Could not update NWU Gradebook data for: siteId: " + siteId + "; studentNumber: " + studentNumber
 						+ "; module: " + module, e);
 			}
+		}
+	}
+	
+	/**
+	 * 
+	 * @param siteId
+	 * @param module
+	 * @param studentGradeMap
+	 * @param status
+	 * @param description
+	 */
+	private static void updateNWUGradebookRecordsWithStatus(String siteId, String module, HashMap<Integer, Double> studentGradeMap, String status, String description) {
+		PreparedStatement nwuGradebookRecordsUpdateStatusPrepStmt = null;
+		Integer studentNumber = null;
+		try {
+			for (Entry<Integer, Double> entry : studentGradeMap.entrySet()) {
+				studentNumber = entry.getKey();
+
+				nwuGradebookRecordsUpdateStatusPrepStmt = connection.prepareStatement(NWU_GRDB_RECORDS_STATUS_UPDATE);
+				nwuGradebookRecordsUpdateStatusPrepStmt.setString(1, status);
+				nwuGradebookRecordsUpdateStatusPrepStmt.setTimestamp(2, Timestamp.valueOf(LocalDateTime.now()));
+				nwuGradebookRecordsUpdateStatusPrepStmt.setString(3, description);
+				nwuGradebookRecordsUpdateStatusPrepStmt.setString(4, siteId);
+				nwuGradebookRecordsUpdateStatusPrepStmt.setString(5, Integer.toString(studentNumber));
+				nwuGradebookRecordsUpdateStatusPrepStmt.setString(6, module);
+
+				// execute the preparedstatement
+				nwuGradebookRecordsUpdateStatusPrepStmt.executeUpdate();
+			}
+	        log.debug("Published NWU Student data & updated NWU_GRADEBOOK_DATA - siteId = " + siteId + ", module = " + module + ", studentNumber = " + studentNumber);
+		} catch (SQLException e) {
+			log.error("Could not update NWU Gradebook data for: siteId: " + siteId + "; studentNumber: " + studentNumber
+					+ "; module: " + module, e);
 		}
 	}
 

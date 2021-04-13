@@ -24,19 +24,23 @@ public class NWUGradebookRecord {
     private String siteId;
 
     private String siteTitle;
+
+	@EqualsAndHashCode.Include
     private String module;
+
+	@EqualsAndHashCode.Include
     private String assessmentName;
     
-	@EqualsAndHashCode.Include
+//	@EqualsAndHashCode.Include
     private String studentNumber;
 
     private int evalDescrId;
 
-	@EqualsAndHashCode.Include
+//	@EqualsAndHashCode.Include
     private double grade;
     private double totalMark;
 
-	@EqualsAndHashCode.Include
+//	@EqualsAndHashCode.Include
     private int gradableObjectId;
 
     private Date recordedDate;
@@ -44,7 +48,7 @@ public class NWUGradebookRecord {
     private Date createdDate;    
     private Date modifiedDate;
 
-	@EqualsAndHashCode.Include
+//	@EqualsAndHashCode.Include
     private String status;
 	
     private int retryCount;

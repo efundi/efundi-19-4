@@ -8,6 +8,7 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.Calendar;
 import java.util.Collections;
@@ -70,10 +71,11 @@ public class PublishNWUGradebookData {
 	
 	
     public static void main(String args[]) {
-    	
-        try {
 
-            log.info("Start Publishing NWU Gradebook Data...");
+    	DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
+        log.info("Start Publishing NWU Gradebook Data at " + dtf.format(LocalDateTime.now()));
+        
+        try {
             
         	LocalDateTime startLocalDateTime = LocalDateTime.parse(args[0]);
         	LocalDateTime endLocalDateTime = LocalDateTime.parse(args[1]);
@@ -94,8 +96,6 @@ public class PublishNWUGradebookData {
         		}	
         		
                 publishGradebookDataToVSS(startLocalDateTime, endLocalDateTime);
-
-                log.info("Migration complete!");
                 
             } finally  {
                 if (connection != null) {
@@ -108,6 +108,8 @@ public class PublishNWUGradebookData {
         } catch (Exception e) {
         	log.error("Could not publish Gradebook Data to VSS. See error log: " + e);
         }
+
+        log.info("Publishing NWU Gradebook Data complete! Finished at " + dtf.format(LocalDateTime.now()));
     }
 	
     /**

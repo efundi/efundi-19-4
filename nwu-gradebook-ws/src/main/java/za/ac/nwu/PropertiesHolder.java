@@ -29,6 +29,8 @@ public class PropertiesHolder {
     private String nwuContextInfoUsername;
     private String nwuContextInfoPassword;
     
+    private String nwuRepublishMaxRetry;
+    
     public PropertiesHolder() {
         loadFromProperties(PROPERTIES_FILENAME);
 
@@ -55,6 +57,7 @@ public class PropertiesHolder {
     public String getWSModuleEnvTypeKey() { return wsModuleEnvTypeKey; }
     public String getNWUContextInfoUsername() { return nwuContextInfoUsername; }
     public String getNWUContextInfoPassword() { return nwuContextInfoPassword; }
+    public String getNWURepublishMaxRetry() { return nwuRepublishMaxRetry; }    
 
     private void loadFromProperties(String filename) {
     	
@@ -103,6 +106,8 @@ public class PropertiesHolder {
                 this.nwuContextInfoUsername = value;
             } else if ("nwu.context.info.password".equals(prop)) {
                 this.nwuContextInfoPassword = value;
+            } else if ("nwu.republish.max.retry".equals(prop)) {
+                this.nwuRepublishMaxRetry = value;
             }
         }
     }

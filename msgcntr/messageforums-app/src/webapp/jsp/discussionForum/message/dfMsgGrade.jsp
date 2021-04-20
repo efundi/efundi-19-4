@@ -209,16 +209,6 @@
 				</h:panelGroup>	
     </h:panelGrid>
 	
-	<% if (hasAssociatedRubric) { %>
-		<sakai-rubric-grading
-			token='<h:outputText value="#{ForumTool.rbcsToken}"/>'
-			tool-id="sakai.forums"
-			entity-id='<%= entityId %>'
-			evaluated-item-id='<%= rbcsEvaluationId %>'
-			evaluated-item-owner-id='<h:outputText value="#{ForumTool.selectedMessage.message.authorId}" />'
-		></sakai-rubric-grading>
-	<%}%>
-	
     <sakai:button_bar>
     	<% if(isDialogBox){ %>
 			<h:commandButton action="#{ForumTool.processDfGradeSubmitFromDialog}" value="#{msgs.cdfm_submit_grade}"

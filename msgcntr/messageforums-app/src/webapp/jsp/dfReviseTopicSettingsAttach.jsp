@@ -380,27 +380,6 @@
 					    </h:panelGroup>
 			  </h:panelGrid>
 
-		<sakai-rubric-association styleClass="checkbox" style="margin-left:10px;display:none"
-
-			token='<h:outputText value="#{ForumTool.rbcsToken}"/>'
-			dont-associate-label='<h:outputText value="#{msgs.topic_dont_associate_label}" />'
-			dont-associate-value="0"
-			associate-label='<h:outputText value="#{msgs.topic_associate_label}" />'
-			associate-value="1"
-
-			tool-id="sakai.forums"
-			<% if(entityId != null && !"".equals(entityId)){ %>
-				entity-id=<%= entityId %>
-			<%}%>
-			<% if(stateDetails != null && !"".equals(stateDetails)){ %>
-				state-details=<%= stateDetails %>
-			<%}%>
-
-			fine-tune-points='<h:outputText value="#{msgs.option_pointsoverride}" />'
-			hide-student-preview='<h:outputText value="#{msgs.option_studentpreview}" />'
-
-		></sakai-rubric-association>
-			  
 				<h:panelGroup rendered="#{ForumTool.selectedTopic.topic.id==null && !empty ForumTool.siteGroups}">
 					<f:verbatim><h4></f:verbatim><h:outputText  value="#{msgs.cdfm_autocreate_topics_header}" /><f:verbatim></h4></f:verbatim>
 				</h:panelGroup>

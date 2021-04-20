@@ -32,14 +32,6 @@
 				<h:graphicImage url="/images/silk/date_delete.png" title="#{msgs.forum_restricted_message}" alt="#{msgs.forum_restricted_message}" rendered="#{ForumTool.selectedForum.forum.availability == 'false'}" style="margin-right:.5em"/>
 				<h:graphicImage url="/images/silk/lock.png" alt="#{msgs.cdfm_forum_locked}" rendered="#{ForumTool.selectedForum.forum.locked == 'true'}" style="margin-right:.5em"/>	
 				<%-- Rubrics marker --%>
-				<h:panelGroup rendered="#{ForumTool.selectedForum.hasRubric == 'true'}">
-					<sakai-rubric-student-preview-button
-						display="icon"
-						token="<h:outputText value="#{ForumTool.rbcsToken}" />"
-						tool-id="sakai.forums"
-						entity-id="<h:outputText value="for.#{ForumTool.selectedForum.forum.id}" />">
-					</sakai-rubric-student-preview-button>
-				</h:panelGroup>
 				<h:outputText value="#{ForumTool.selectedForum.forum.title}" styleClass="title"/>
 				<h:outputText value=" "  styleClass="actionLinks"/>
         		<h:commandLink action="#{ForumTool.processActionNewTopic}"  value="#{msgs.cdfm_new_topic}" rendered="#{ForumTool.selectedForum.newTopic}" 
@@ -122,14 +114,6 @@
 						<h:graphicImage url="/images/silk/date_delete.png" title="#{msgs.topic_restricted_message}" alt="#{msgs.topic_restricted_message}" rendered="#{topic.availability == 'false'}" style="margin-right:.5em"/>
 						<h:graphicImage url="/images/silk/lock.png" alt="#{msgs.cdfm_forum_locked}" rendered="#{ForumTool.selectedForum.forum.locked == 'true' || topic.locked == 'true'}" style="margin-right:.5em"/>
 						<%-- Rubrics marker --%>
-						<h:panelGroup rendered="#{topic.hasRubric == 'true'}">
-							<sakai-rubric-student-preview-button
-								display="icon"
-								token="<h:outputText value="#{ForumTool.rbcsToken}" />"
-								tool-id="sakai.forums"
-								entity-id="<h:outputText value="top.#{topic.topic.id}" />">
-							</sakai-rubric-student-preview-button>
-						</h:panelGroup>
 						<h:commandLink action="#{ForumTool.processActionDisplayTopic}" id="topic_title" title=" #{topic.topic.title}" styleClass="title">
 						  <f:param value="#{topic.topic.id}" name="topicId"/>
 						  <f:param value="#{ForumTool.selectedForum.forum.id}" name="forumId"/>

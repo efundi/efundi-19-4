@@ -76,7 +76,6 @@ public class RubricGradePanel extends BasePanel {
         sakaiRubricGrading.add(AttributeModifier.append("evaluated-item-id", assignmentId + "." + studentUuid));
         sakaiRubricGrading.add(AttributeModifier.append("evaluated-item-owner-id", studentUuid));
 
-		sakaiRubricGrading.add(AttributeModifier.append("token", rubricsService.generateJsonWebToken(RubricsConstants.RBCS_TOOL_GRADEBOOKNG)));
         form.add(sakaiRubricGrading);
 
         final GbAjaxButton submit = new GbAjaxButton("submit") {
@@ -106,7 +105,5 @@ public class RubricGradePanel extends BasePanel {
 	public void renderHead(final IHeaderResponse response) {
 
 		final String version = PortalUtils.getCDNQuery();
-		response.render(StringHeaderItem.forString(
-			"<script type=\"module\" src=\"/rubrics-service/webcomponents/rubric-association-requirements.js" + version + "\"></script>"));
     }
 }

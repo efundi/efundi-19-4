@@ -141,7 +141,6 @@ import org.sakaiproject.util.ResourceLoader;
 import org.springframework.orm.hibernate4.HibernateOptimisticLockingFailureException;
 import org.sakaiproject.rubrics.logic.model.ToolItemRubricAssociation;
 import org.sakaiproject.rubrics.logic.RubricsConstants;
-import org.sakaiproject.rubrics.logic.RubricsService;
 
 import lombok.extern.slf4j.Slf4j;
 import net.sf.json.JSON;
@@ -389,7 +388,6 @@ public class DiscussionForumTool
   private SessionManager sessionManager;
   private ToolManager toolManager;
   private ThreadLocalManager threadLocalManager;
-  private RubricsService rubricsService;
 
 
   private Boolean instructor = null;
@@ -468,10 +466,6 @@ public class DiscussionForumTool
 
   public void setThreadLocalManager(ThreadLocalManager threadLocalManager) {
 	this.threadLocalManager = threadLocalManager;
-  }
-
-  public void setRubricsService(RubricsService rubricsService) {
-	this.rubricsService = rubricsService;
   }
 
   private String editorRows;
@@ -1158,9 +1152,6 @@ public class DiscussionForumTool
 
     forumManager.deleteForum(selectedForum.getForum());
 
-    // remove rubric association if there is one
-    rubricsService.deleteRubricAssociation(RubricsConstants.RBCS_TOOL_FORUMS, RubricsConstants.RBCS_FORUM_ENTITY_PREFIX + forumId);
-
     if(beforeChangeHM != null){
         updateSynopticMessagesForForumComparingOldMessagesCount(getSiteId(), forumId, null, beforeChangeHM, SynopticMsgcntrManager.NUM_OF_ATTEMPTS);
     }
@@ -1530,9 +1521,6 @@ public class DiscussionForumTool
       updateSynopticMessagesForForumComparingOldMessagesCount(getSiteId(), forum.getId(), null, beforeChangeHM, SynopticMsgcntrManager.NUM_OF_ATTEMPTS);
     }
 
-    //RUBRICS, Save the binding between the forum and the rubric
-    rubricsService.saveRubricAssociation(RubricsConstants.RBCS_TOOL_FORUMS, RubricsConstants.RBCS_FORUM_ENTITY_PREFIX + forum.getId(), getRubricConfigurationParameters());
-
     selectedForum.getForum().setId(forum.getId());
     return forum;
   }
@@ -1898,9 +1886,6 @@ public class DiscussionForumTool
     	}
     }
 
-    //RUBRICS, Save the binding between the topic and the rubric
-    rubricsService.saveRubricAssociation(RubricsConstants.RBCS_TOOL_FORUMS, RubricsConstants.RBCS_TOPIC_ENTITY_PREFIX + selectedTopic.getTopic().getId(), getRubricConfigurationParameters());
-
     return processReturnToOriginatingPage();
     //reset();
     //return MAIN;
@@ -2121,9 +2106,6 @@ public class DiscussionForumTool
     beforeChangeHM = SynopticMsgcntrManagerCover.getUserToNewMessagesForForumMap(getSiteId(), forumId, topicId);
 
     forumManager.deleteTopic(selectedTopic.getTopic());
-
-    // remove rubric association if there is one
-    rubricsService.deleteRubricAssociation(RubricsConstants.RBCS_TOOL_FORUMS, RubricsConstants.RBCS_TOPIC_ENTITY_PREFIX + topicId);
 
     if(beforeChangeHM != null){
         updateSynopticMessagesForForumComparingOldMessagesCount(getSiteId(), forumId, topicId, beforeChangeHM, SynopticMsgcntrManager.NUM_OF_ATTEMPTS);
@@ -8216,16 +8198,6 @@ public class DiscussionForumTool
 	newTopic = forumManager.saveTopic(newTopic, fromTopic.getDraft(), params);
 	selectedTopic = new DiscussionTopicBean(newTopic, forum, uiPermissionsManager, forumManager);
 
-	//copy rubrics
-	try {
-		Optional<ToolItemRubricAssociation> rubricAssociation = rubricsService.getRubricAssociation(RubricsConstants.RBCS_TOOL_FORUMS, RubricsConstants.RBCS_TOPIC_ENTITY_PREFIX + fromTopic.getId());
-		if (rubricAssociation.isPresent()) {
-			rubricsService.saveRubricAssociation(RubricsConstants.RBCS_TOOL_FORUMS, RubricsConstants.RBCS_TOPIC_ENTITY_PREFIX + newTopic.getId(), rubricAssociation.get().getFormattedAssociation());
-		}
-	} catch(Exception e){
-		log.error("Error while trying to duplicate Rubrics: {} ", e.getMessage());
-	}
-
     if("true".equalsIgnoreCase(ServerConfigurationService.getString("mc.defaultLongDescription")))
     {
     	selectedTopic.setReadFullDesciption(true);
@@ -8316,16 +8288,6 @@ public class DiscussionForumTool
 		}
 
 		forum = saveForumSettings(oldForum.getDraft());
-
-		//copy rubrics
-		try {
-			Optional<ToolItemRubricAssociation> rubricAssociation = rubricsService.getRubricAssociation(RubricsConstants.RBCS_TOOL_FORUMS, RubricsConstants.RBCS_FORUM_ENTITY_PREFIX + oldForum.getId());
-			if (rubricAssociation.isPresent()) {
-				rubricsService.saveRubricAssociation(RubricsConstants.RBCS_TOOL_FORUMS, RubricsConstants.RBCS_FORUM_ENTITY_PREFIX + forum.getId(), rubricAssociation.get().getFormattedAssociation());
-			}
-		} catch(Exception e){
-			log.error("Error while trying to duplicate Rubrics: {} ", e.getMessage());
-		}
 
 		forum = forumManager.getForumById(forum.getId());
 		List attachList = forum.getAttachments();
@@ -9654,11 +9616,6 @@ public class DiscussionForumTool
 		return list;
 	}
 
-	public String getRbcsToken() {
-		log.debug("getRbcsToken()");
-		return rubricsService.generateJsonWebToken(RubricsConstants.RBCS_TOOL_FORUMS);
-	}
-
 	public String getRbcsStateDetails() {
 		log.debug("getRbcsStateDetails() " + rbcsStateDetails);
 		return rbcsStateDetails;
@@ -9685,13 +9642,7 @@ public class DiscussionForumTool
 	}
 
 	public String getRubricAssociationId(){
-		if(selectedTopic != null && rubricsService.hasAssociatedRubric(RubricsConstants.RBCS_TOOL_FORUMS, RubricsConstants.RBCS_TOPIC_ENTITY_PREFIX + selectedTopic.getTopic().getId())){
-			return RubricsConstants.RBCS_TOPIC_ENTITY_PREFIX + selectedTopic.getTopic().getId();
-		} else if(selectedForum != null && rubricsService.hasAssociatedRubric(RubricsConstants.RBCS_TOOL_FORUMS, RubricsConstants.RBCS_FORUM_ENTITY_PREFIX + selectedForum.getForum().getId())) {
-			return RubricsConstants.RBCS_FORUM_ENTITY_PREFIX + selectedForum.getForum().getId();
-		} else {
-			return null;
-		}
+    return null;
 	}
 
 	public String getCDNQuery() {

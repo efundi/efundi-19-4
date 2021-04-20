@@ -45,7 +45,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.sakaiproject.component.cover.ServerConfigurationService;
 import org.sakaiproject.rubrics.logic.RubricsConstants;
-import org.sakaiproject.rubrics.logic.RubricsService;
 import org.sakaiproject.spring.SpringBeanLocator;
 import org.sakaiproject.tool.assessment.data.dao.assessment.AssessmentAccessControl;
 import org.sakaiproject.tool.assessment.data.dao.assessment.EvaluationModel;
@@ -105,8 +104,6 @@ import org.sakaiproject.tool.assessment.data.ifc.shared.TypeIfc;
 	private static final String MSG_BUNDLE = "org.sakaiproject.tool.assessment.bundle.EvaluationMessages";
 	private static final String noAnswer = ContextUtil.getLocalizedString(MSG_BUNDLE, "no_answer");
 	private static final String noneOfTheAbove = ContextUtil.getLocalizedString(MSG_BUNDLE, "none_above");
-
-	private RubricsService rubricsService = (RubricsService) SpringBeanLocator.getInstance().getBean("org.sakaiproject.rubrics.logic.RubricsService");
 
 	/**
 	 * Standard process action method.
@@ -972,7 +969,7 @@ import org.sakaiproject.tool.assessment.data.ifc.shared.TypeIfc;
 			bean.setAgentResultsByItemGradingId(agentResultsByItemGradingIdMap);
 
 			bean.setRubricStateDetails("");
-			bean.setHasAssociatedRubric(rubricsService.hasAssociatedRubric(RubricsConstants.RBCS_TOOL_SAMIGO, RubricsConstants.RBCS_PUBLISHED_ASSESSMENT_ENTITY_PREFIX + bean.getPublishedId() + "." + bean.getItemId()));
+			bean.setHasAssociatedRubric(false);
 		}
 
 		catch (RuntimeException e) {

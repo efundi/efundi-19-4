@@ -327,7 +327,6 @@ public class GradeSummaryTablePanel extends BasePanel {
 							sakaiRubricPreview.add(AttributeModifier.append("display", "icon"));
 							sakaiRubricPreview.add(AttributeModifier.append("tool-id", RubricsConstants.RBCS_TOOL_GRADEBOOKNG));
 							sakaiRubricPreview.add(AttributeModifier.append("evaluated-item-id", assignment.getId() + "." + studentUuid));
-							sakaiRubricPreview.add(AttributeModifier.append("token", rubricsService.generateJsonWebToken(RubricsConstants.RBCS_TOOL_GRADEBOOKNG)));
 
 							if (!showingStudentView && (GradeSummaryTablePanel.this.getUserRole() == GbRole.INSTRUCTOR
 										|| GradeSummaryTablePanel.this.getUserRole() == GbRole.TA)) {
@@ -347,7 +346,6 @@ public class GradeSummaryTablePanel extends BasePanel {
 
 							final WebMarkupContainer sakaiRubricPreview = new WebMarkupContainer("sakai-rubric-student-button");
 							sakaiRubricPreview.add(AttributeModifier.append("display", "icon"));
-							sakaiRubricPreview.add(AttributeModifier.append("token", rubricsService.generateJsonWebToken(RubricsConstants.RBCS_TOOL_GRADEBOOKNG)));
 
 							if (!showingStudentView && (GradeSummaryTablePanel.this.getUserRole() == GbRole.INSTRUCTOR
 										|| GradeSummaryTablePanel.this.getUserRole() == GbRole.TA)) {
@@ -359,9 +357,6 @@ public class GradeSummaryTablePanel extends BasePanel {
 								String[] bits = assignment.getExternalId().split("/");
 								if (bits != null && bits.length >= 1) {
 									String assignmentId = bits[bits.length-1];
-									String submissionId = rubricsService.getRubricEvaluationObjectId(assignmentId, studentUuid, RubricsConstants.RBCS_TOOL_ASSIGNMENT);
-									sakaiRubricPreview.add(AttributeModifier.append("entity-id", assignmentId));
-									sakaiRubricPreview.add(AttributeModifier.append("evaluated-item-id", submissionId));
 								} else {
 									log.warn(assignment.getExternalId() + " is not a valid assignment reference");
 								}
@@ -422,7 +417,5 @@ public class GradeSummaryTablePanel extends BasePanel {
 	public void renderHead(final IHeaderResponse response) {
 
 		final String version = PortalUtils.getCDNQuery();
-		response.render(StringHeaderItem.forString(
-			"<script type=\"module\" src=\"/rubrics-service/webcomponents/rubric-association-requirements.js" + version + "\"></script>"));
     }
 }

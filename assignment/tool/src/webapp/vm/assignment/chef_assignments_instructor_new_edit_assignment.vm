@@ -1,5 +1,4 @@
 <!-- start: chef_assignments_instructor_new_edit_assignment.vm  -->
-#module("/rubrics-service/webcomponents/rubric-association-requirements.js")
 #set( $H = '-' )
 <!-- Initialize the Bootstrap-multiselect plugin: -->
 <script type="text/javascript">

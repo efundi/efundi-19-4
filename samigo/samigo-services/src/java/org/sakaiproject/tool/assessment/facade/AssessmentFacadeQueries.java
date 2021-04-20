@@ -49,7 +49,6 @@ import org.sakaiproject.exception.PermissionException;
 import org.sakaiproject.exception.TypeException;
 import org.sakaiproject.rubrics.logic.model.ToolItemRubricAssociation;
 import org.sakaiproject.rubrics.logic.RubricsConstants;
-import org.sakaiproject.rubrics.logic.RubricsService;
 import org.sakaiproject.samigo.util.SamigoConstants;
 import org.sakaiproject.service.gradebook.shared.GradebookExternalAssessmentService;
 import org.sakaiproject.site.api.Group;
@@ -394,9 +393,6 @@ public class AssessmentFacadeQueries extends HibernateDaoSupport implements Asse
 			if (log.isDebugEnabled()) log.debug("*** we have no. of resource in assessment=" + resourceIdList.size());
 			s.deleteResources(resourceIdList);
 		}
-
-		RubricsService rubricsService = (RubricsService) SpringBeanLocator.getInstance().getBean("org.sakaiproject.rubrics.logic.RubricsService");
-		rubricsService.deleteRubricAssociationsByItemIdPrefix(assessmentId + ".", RubricsConstants.RBCS_TOOL_SAMIGO);
 
 		assessment.setLastModifiedBy(AgentFacade.getAgentString());
 		assessment.setLastModifiedDate(new Date());
@@ -983,16 +979,6 @@ public class AssessmentFacadeQueries extends HibernateDaoSupport implements Asse
 					.getAssessment();
 			assessment.setLastModifiedBy(AgentFacade.getAgentString());
 			assessment.setLastModifiedDate(new Date());
-
-			Set itemSet = section.getItemSet();
-			Iterator iter1 = itemSet.iterator();
-			RubricsService rubricsService = (RubricsService) SpringBeanLocator.getInstance().getBean("org.sakaiproject.rubrics.logic.RubricsService");
-			while (iter1.hasNext()) {
-				ItemDataIfc item = (ItemDataIfc) iter1.next();
-				// delete rubric association
-				String associationId = assessment.getAssessmentId() + "." + item.getItemId();
-				rubricsService.deleteRubricAssociation(RubricsConstants.RBCS_TOOL_SAMIGO, associationId);	
-			}
 
 			// lazy loading on sectionSet, so need to initialize it
 			Set sectionSet = getSectionSetForAssessment(assessment);
@@ -1611,7 +1597,6 @@ public class AssessmentFacadeQueries extends HibernateDaoSupport implements Asse
 		List<AssessmentData> list = getAllActiveAssessmentsByAgent(fromContext);
 		List<AssessmentData> newList = new ArrayList<>();
 		Map<AssessmentData, String> assessmentMap = new HashMap<>();
-		RubricsService rubricsService = (RubricsService) SpringBeanLocator.getInstance().getBean("org.sakaiproject.rubrics.logic.RubricsService");
 		for (AssessmentData a : list) {
 			log.debug("****protocol:" + ServerConfigurationService.getServerUrl());
 			AssessmentData new_a = prepareAssessment(a, ServerConfigurationService.getServerUrl(), toContext);
@@ -1648,15 +1633,6 @@ public class AssessmentFacadeQueries extends HibernateDaoSupport implements Asse
 					String oldRef = assessmentMap.get(a);
 					String associationId = oldRef.substring(CoreAssessmentEntityProvider.ENTITY_PREFIX.length() + 1) + "." + item.getOriginalItemId();
 
-					try{
-						if(rubricsService.getRubricAssociation(RubricsConstants.RBCS_TOOL_SAMIGO, associationId, fromContext).isPresent()) {
-							transversalMap.put(ItemEntityProvider.ENTITY_PREFIX + "/" + associationId, ItemEntityProvider.ENTITY_PREFIX + "/" + a.getAssessmentBaseId() + "." + item.getItemId());
-						}
-					} catch(HttpClientErrorException hcee) {
-						log.debug("Current user doesn't have permission to get a rubric: {}", hcee.getMessage());
-					} catch(Exception e){
-						log.error("Error while trying to duplicate Rubrics: {} ", e.getMessage());
-					}
 					Set itemMetaDataSet = item.getItemMetaDataSet();
 					Iterator itemMetaDataIter = itemMetaDataSet.iterator();
 					while (itemMetaDataIter.hasNext()) {
@@ -1699,7 +1675,6 @@ public class AssessmentFacadeQueries extends HibernateDaoSupport implements Asse
 	public void copyAssessment(String assessmentId, String appendCopyTitle) {
 		AssessmentData assessmentData = loadAssessment(Long.valueOf(assessmentId));
 		assessmentData.setSectionSet(getSectionSetForAssessment(assessmentData));
-		RubricsService rubricsService = (RubricsService) SpringBeanLocator.getInstance().getBean("org.sakaiproject.rubrics.logic.RubricsService");
 		AssessmentData newAssessmentData = prepareAssessment(assessmentData, ServerConfigurationService.getServerUrl(), AgentFacade.getCurrentSiteId());
 		updateTitleForCopy(newAssessmentData, appendCopyTitle);
 		getHibernateTemplate().saveOrUpdate(newAssessmentData);
@@ -1718,18 +1693,6 @@ public class AssessmentFacadeQueries extends HibernateDaoSupport implements Asse
 			while (itemIter.hasNext()) {
 				ItemData item = (ItemData) itemIter.next();
 				
-				//copy rubrics
-				try {
-					String associationId = assessmentId + "." + item.getOriginalItemId();
-					
-					Optional<ToolItemRubricAssociation> rubricAssociation = rubricsService.getRubricAssociation(RubricsConstants.RBCS_TOOL_SAMIGO, associationId);
-					if (rubricAssociation.isPresent()) {
-						rubricsService.saveRubricAssociation(RubricsConstants.RBCS_TOOL_SAMIGO, newAssessmentData.getAssessmentId()+ "." + item.getItemId(), rubricAssociation.get().getFormattedAssociation());
-					}
-				} catch(Exception e){
-					log.error("Error while trying to duplicate Rubrics: {} ", e.getMessage());
-				}
-					
 				//We use this place to add the saveItem Events used by the search index to index all the new questions
 				EventTrackingService.post(EventTrackingService.newEvent(SamigoConstants.EVENT_ASSESSMENT_SAVEITEM, "/sam/" + AgentFacade.getCurrentSiteId() + "/saved itemId=" + item.getItemId().toString(), true));
 				Set itemMetaDataSet = item.getItemMetaDataSet();

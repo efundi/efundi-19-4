@@ -48,7 +48,6 @@ import org.sakaiproject.event.api.LearningResourceStoreService.LRS_Verb;
 import org.sakaiproject.event.api.LearningResourceStoreService.LRS_Verb.SAKAI_VERB;
 import org.sakaiproject.event.api.NotificationService;
 import org.sakaiproject.rubrics.logic.RubricsConstants;
-import org.sakaiproject.rubrics.logic.RubricsService;
 import org.sakaiproject.samigo.util.SamigoConstants;
 import org.sakaiproject.tool.assessment.data.dao.grading.AssessmentGradingData;
 import org.sakaiproject.tool.assessment.data.dao.grading.ItemGradingAttachment;
@@ -82,7 +81,6 @@ import org.sakaiproject.tool.cover.SessionManager;
   implements ActionListener
 {
   private final EventTrackingService eventTrackingService= ComponentManager.get( EventTrackingService.class );
-  private final RubricsService rubricsService = ComponentManager.get(RubricsService.class);
 
   //private static EvaluationListenerUtil util;
   //private static BeanSort bs;

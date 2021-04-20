@@ -40,7 +40,6 @@ import org.sakaiproject.api.app.messageforums.ui.DiscussionForumManager;
 import org.sakaiproject.api.app.messageforums.ui.UIPermissionsManager;
 import org.sakaiproject.component.cover.ComponentManager;
 import org.sakaiproject.rubrics.logic.RubricsConstants;
-import org.sakaiproject.rubrics.logic.RubricsService;
 import org.sakaiproject.util.ResourceLoader;
 
 /**
@@ -101,8 +100,6 @@ public class DiscussionTopicBean
   
   private static final String MESSAGECENTER_BUNDLE = "org.sakaiproject.api.app.messagecenter.bundle.Messages";
   private static final ResourceLoader rb = new ResourceLoader(MESSAGECENTER_BUNDLE);
-
-  private static RubricsService rubricsService = ComponentManager.get(RubricsService.class);
 
   private List messages = new ArrayList();
 
@@ -1349,6 +1346,6 @@ public class DiscussionTopicBean
 		topic.setRestrictPermissionsForGroups(Boolean.parseBoolean(restrictPermissionsForGroups));
 	}
 	public String getHasRubric(){
-		return rubricsService.hasAssociatedRubric(RubricsConstants.RBCS_TOOL_FORUMS, RubricsConstants.RBCS_TOPIC_ENTITY_PREFIX + topic.getId()) ? Boolean.TRUE.toString() : Boolean.FALSE.toString();
+		return "false";
 	}
 }

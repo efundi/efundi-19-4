@@ -289,7 +289,6 @@ public class AddOrEditGradeItemPanelContent extends BasePanel {
 		sakaiRubricAssociation.add(AttributeModifier.append("fine-tune-points", new ResourceModel("rubrics.option_pointsoverride")));
 		sakaiRubricAssociation.add(AttributeModifier.append("hide-student-preview", new ResourceModel("rubrics.option_studentpreview")));
 		sakaiRubricAssociation.add(AttributeModifier.append("tool-id", RubricsConstants.RBCS_TOOL_GRADEBOOKNG));
-		sakaiRubricAssociation.add(AttributeModifier.append("token", rubricsService.generateJsonWebToken(RubricsConstants.RBCS_TOOL_GRADEBOOKNG)));
 
 		if (assignment.getId() != null) {
 			sakaiRubricAssociation.add(AttributeModifier.append("entity-id", assignment.getId()));
@@ -359,7 +358,5 @@ public class AddOrEditGradeItemPanelContent extends BasePanel {
 	public void renderHead(final IHeaderResponse response) {
 
 		final String version = PortalUtils.getCDNQuery();
-		response.render(StringHeaderItem.forString(
-			"<script type=\"module\" src=\"/rubrics-service/webcomponents/rubric-association-requirements.js" + version + "\"></script>"));
 	}
 }

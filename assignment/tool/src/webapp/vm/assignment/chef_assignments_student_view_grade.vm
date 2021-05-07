@@ -1,5 +1,4 @@
 <!-- start: chef_assignments_student_view_grade.vm  -->
-#module("/rubrics-service/webcomponents/rubric-association-requirements.js")
 <script>
     $(document).ready(function () {
         ASN.setupToggleAreas('toggleAnchor', 'toggledContent', false, 'fast');

@@ -21,7 +21,6 @@
 		<script>includeWebjarLibrary('awesomplete')</script>
 		<script src="/library/js/sakai-reminder.js"></script>
 		<script src="/webcomponents/assets/@webcomponents/webcomponentsjs/webcomponents-loader.js"></script>
-		<script type="module" src="/rubrics-service/webcomponents/rubric-association-requirements.js<h:outputText value="#{ForumTool.CDNQuery}" />"></script>
   <h:form id="msgForum">
 <!--jsp\discussionForum\message\dfMsgGrade.jsp-->
 
@@ -209,16 +208,6 @@
        		rendered="#{!ForumTool.selGBItemRestricted}" readonly="#{!ForumTool.allowedToGradeItem}"/>
 				</h:panelGroup>	
     </h:panelGrid>
-	
-	<% if (hasAssociatedRubric) { %>
-		<sakai-rubric-grading
-			token='<h:outputText value="#{ForumTool.rbcsToken}"/>'
-			tool-id="sakai.forums"
-			entity-id='<%= entityId %>'
-			evaluated-item-id='<%= rbcsEvaluationId %>'
-			evaluated-item-owner-id='<h:outputText value="#{ForumTool.selectedMessage.message.authorId}" />'
-		></sakai-rubric-grading>
-	<%}%>
 	
     <sakai:button_bar>
     	<% if(isDialogBox){ %>

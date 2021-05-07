@@ -50,7 +50,6 @@ import org.hibernate.criterion.Restrictions;
 import org.sakaiproject.authz.cover.SecurityService;
 import org.sakaiproject.component.api.ServerConfigurationService;
 import org.sakaiproject.hibernate.HibernateCriterionUtils;
-import org.sakaiproject.rubrics.logic.RubricsService;
 import org.sakaiproject.section.api.coursemanagement.CourseSection;
 import org.sakaiproject.section.api.coursemanagement.EnrollmentRecord;
 import org.sakaiproject.section.api.coursemanagement.User;
@@ -110,8 +109,6 @@ public class GradebookServiceHibernateImpl extends BaseHibernateManager implemen
 	@Setter
 	protected ServerConfigurationService serverConfigService;
 
-	@Getter @Setter
-	private RubricsService rubricsService;
 	@Override
 	public boolean isAssignmentDefined(final String gradebookUid, final String assignmentName) {
 		if (!isUserAbleToViewAssignments(gradebookUid)) {

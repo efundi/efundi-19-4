@@ -41,7 +41,6 @@ $Id$
     <script src="/samigo-app/js/jquery.dynamiclist.student.preview.js"></script>
     <script src="/samigo-app/js/selection.student.preview.js"></script>
     <script src="/samigo-app/js/selection.author.preview.js"></script>
-    <script type="module" src="/rubrics-service/webcomponents/rubric-association-requirements.js<h:outputText value="#{studentScores.CDNQuery}" />"></script>
 
     <link rel="stylesheet" type="text/css" href="/samigo-app/css/imageQuestion.student.css">
     <link rel="stylesheet" type="text/css" href="/samigo-app/css/imageQuestion.author.css">

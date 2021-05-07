@@ -51,7 +51,6 @@ import org.sakaiproject.email.cover.EmailService;
 import org.sakaiproject.event.cover.EventTrackingService;
 import org.sakaiproject.exception.IdUnusedException;
 import org.sakaiproject.rubrics.logic.RubricsConstants;
-import org.sakaiproject.rubrics.logic.RubricsService;
 import org.sakaiproject.rubrics.logic.model.ToolItemRubricAssociation;
 import org.sakaiproject.site.api.Site;
 import org.sakaiproject.site.cover.SiteService;
@@ -108,10 +107,7 @@ public class PublishAssessmentListener
   private CalendarServiceHelper calendarService = IntegrationContextFactory.getInstance().getCalendarServiceHelper();
   private ResourceLoader rl= new ResourceLoader("org.sakaiproject.tool.assessment.bundle.AssessmentSettingsMessages");
 
-  private RubricsService rubricsService;
-
   public PublishAssessmentListener() {
-    rubricsService = ComponentManager.get(RubricsService.class);
   }
 
   public void processAction(ActionEvent ae) throws AbortProcessingException {
@@ -230,15 +226,6 @@ public class PublishAssessmentListener
         for (Object itemObj : sectionData.getItemSet()){
           PublishedItemData itemData = (PublishedItemData) itemObj;
           EventTrackingService.post(EventTrackingService.newEvent(SamigoConstants.EVENT_PUBLISHED_ASSESSMENT_SAVEITEM, "/sam/" + AgentFacade.getCurrentSiteId() + "/publish, publishedItemId=" + itemData.getItemIdString(), true));
-
-          try {
-            Optional<ToolItemRubricAssociation> rubricAssociation = rubricsService.getRubricAssociation(RubricsConstants.RBCS_TOOL_SAMIGO, assessmentSettings.getAssessmentId().toString() + "." + itemData.getOriginalItemId().toString());
-            if (rubricAssociation.isPresent()) {
-              rubricsService.saveRubricAssociation(RubricsConstants.RBCS_TOOL_SAMIGO, RubricsConstants.RBCS_PUBLISHED_ASSESSMENT_ENTITY_PREFIX + pub.getPublishedAssessmentId().toString() + "." + itemData.getItemIdString(), rubricAssociation.get().getFormattedAssociation());
-            }
-          } catch(HttpClientErrorException hcee) {
-            log.debug("Current user doesn't have permission to get a rubric: {}", hcee.getMessage());
-          }
         }
       }
 

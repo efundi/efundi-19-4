@@ -75,7 +75,6 @@ import org.sakaiproject.gradebookng.business.util.FormatHelper;
 import org.sakaiproject.gradebookng.business.util.GbStopWatch;
 import org.sakaiproject.gradebookng.tool.model.GradebookUiSettings;
 import org.sakaiproject.rubrics.logic.RubricsConstants;
-import org.sakaiproject.rubrics.logic.RubricsService;
 import org.sakaiproject.section.api.SectionManager;
 import org.sakaiproject.section.api.coursemanagement.EnrollmentRecord;
 import org.sakaiproject.service.gradebook.shared.AssessmentNotFoundException;
@@ -161,9 +160,6 @@ public class GradebookNgBusinessService {
 
 	@Setter
 	private SecurityService securityService;
-
-	@Setter
-	private RubricsService rubricsService;
 
 	public static final String GB_PREF_KEY = "GBNG-";
 	public static final String ASSIGNMENT_ORDER_PROP = "gbng_assignment_order";
@@ -929,11 +925,11 @@ public class GradebookNgBusinessService {
 		for (Assignment assignment : assignments) {
 			String externalAppName = assignment.getExternalAppName();
 			if(externalAppName!=null) {
-				boolean hasAssociatedRubric = StringUtils.equals(externalAppName, toolManager.getLocalizedToolProperty("sakai.assignment", "title")) ? rubricsService.hasAssociatedRubric(externalAppName, assignment.getExternalId()) : false;
+				boolean hasAssociatedRubric = false;
 				map.put(assignment.getExternalId(), hasAssociatedRubric);
 			} else {
 				Long assignmentId = assignment.getId();
-				boolean hasAssociatedRubric = rubricsService.hasAssociatedRubric(RubricsConstants.RBCS_TOOL_GRADEBOOKNG, assignmentId.toString());
+				boolean hasAssociatedRubric = false;
 				map.put(assignmentId.toString(), hasAssociatedRubric);
 			}
 		}
@@ -2460,7 +2456,6 @@ public class GradebookNgBusinessService {
 	 * @param assignmentId the id of the assignment to remove
 	 */
 	public void removeAssignment(final Long assignmentId) {
-		rubricsService.deleteRubricAssociation(RubricsConstants.RBCS_TOOL_GRADEBOOKNG, assignmentId.toString());
 		this.gradebookService.removeAssignment(assignmentId);
 
 		EventHelper.postDeleteAssignmentEvent(getGradebook(), assignmentId, getUserRoleOrNone());

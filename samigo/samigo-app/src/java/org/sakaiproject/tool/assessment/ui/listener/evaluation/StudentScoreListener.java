@@ -37,7 +37,6 @@ import lombok.extern.slf4j.Slf4j;
 
 import org.sakaiproject.component.cover.ComponentManager;
 import org.sakaiproject.rubrics.logic.RubricsConstants;
-import org.sakaiproject.rubrics.logic.RubricsService;
 import org.sakaiproject.tool.assessment.data.dao.grading.AssessmentGradingData;
 import org.sakaiproject.tool.assessment.data.dao.grading.ItemGradingData;
 import org.sakaiproject.tool.assessment.facade.AgentFacade;
@@ -69,8 +68,6 @@ import org.sakaiproject.util.FormattedText;
 {
   private static EvaluationListenerUtil util;
   private static BeanSort bs;
-
-  private RubricsService rubricsService = ComponentManager.get(RubricsService.class);
 
   /**
    * Standard process action method.
@@ -161,7 +158,6 @@ import org.sakaiproject.util.FormattedText;
               .forEach(p -> p.getItemContents().stream()
                       .filter(Objects::nonNull)
                       .forEach(i -> {
-                          i.setHasAssociatedRubric(rubricsService.hasAssociatedRubric(RubricsConstants.RBCS_TOOL_SAMIGO, RubricsConstants.RBCS_PUBLISHED_ASSESSMENT_ENTITY_PREFIX + publishedId + "." + i.getItemData().getItemId()));
                           i.getItemGradingDataArray()
                                   .forEach(d -> itemContentsMap.put(d.getItemGradingId(), i));
                       }));

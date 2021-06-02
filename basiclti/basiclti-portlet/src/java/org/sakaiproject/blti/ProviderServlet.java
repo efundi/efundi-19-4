@@ -19,59 +19,57 @@
 
 package org.sakaiproject.blti;
 
+import static org.sakaiproject.site.api.SiteService.SITE_TITLE_MAX_LENGTH;
+
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URLEncoder;
 import java.net.URL;
-import java.net.MalformedURLException;
-import java.util.*;
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 
-import javax.servlet.ServletConfig;
-import javax.servlet.ServletException;
-import javax.servlet.ServletContext;
 import javax.servlet.RequestDispatcher;
+import javax.servlet.ServletConfig;
+import javax.servlet.ServletContext;
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import lombok.extern.slf4j.Slf4j;
-
-import net.oauth.*;
-import net.oauth.server.OAuthServlet;
-import net.oauth.signature.OAuthSignatureMethod;
-
-
-import org.tsugi.basiclti.BasicLTIConstants;
-import org.tsugi.basiclti.BasicLTIUtil;
-
-import org.tsugi.contentitem.objects.ContentItemResponse;
-
-import org.tsugi.jackson.JacksonUtil;
-
 import org.sakaiproject.authz.api.SecurityAdvisor;
 import org.sakaiproject.authz.cover.SecurityService;
-import org.sakaiproject.lti.api.BLTIProcessor;
-import org.sakaiproject.lti.api.LTIException;
-import org.sakaiproject.lti.api.LTIService;
-import org.sakaiproject.lti.api.SiteEmailPreferenceSetter;
-import org.sakaiproject.lti.api.UserFinderOrCreator;
-import org.sakaiproject.lti.api.UserLocaleSetter;
-import org.sakaiproject.lti.api.UserPictureSetter;
-import org.sakaiproject.lti.api.SiteMembershipUpdater;
-import org.sakaiproject.lti.api.SiteMembershipsSynchroniser;
+import org.sakaiproject.basiclti.util.LegacyShaUtil;
 import org.sakaiproject.basiclti.util.SakaiBLTIUtil;
 import org.sakaiproject.basiclti.util.SakaiContentItemUtil;
 import org.sakaiproject.basiclti.util.SakaiLTIProviderUtil;
-import org.sakaiproject.basiclti.util.LegacyShaUtil;
 import org.sakaiproject.component.cover.ComponentManager;
 import org.sakaiproject.component.cover.ServerConfigurationService;
 import org.sakaiproject.event.cover.UsageSessionService;
 import org.sakaiproject.exception.IdUnusedException;
+import org.sakaiproject.lti.api.BLTIProcessor;
+import org.sakaiproject.lti.api.LTIException;
+import org.sakaiproject.lti.api.LTIService;
+import org.sakaiproject.lti.api.SiteEmailPreferenceSetter;
+import org.sakaiproject.lti.api.SiteMembershipUpdater;
+import org.sakaiproject.lti.api.SiteMembershipsSynchroniser;
+import org.sakaiproject.lti.api.UserFinderOrCreator;
+import org.sakaiproject.lti.api.UserLocaleSetter;
+import org.sakaiproject.lti.api.UserPictureSetter;
 import org.sakaiproject.site.api.Site;
 import org.sakaiproject.site.api.SitePage;
-import static org.sakaiproject.site.api.SiteService.SITE_TITLE_MAX_LENGTH;
 import org.sakaiproject.site.api.SiteService.SiteTitleValidationStatus;
 import org.sakaiproject.site.api.ToolConfiguration;
 import org.sakaiproject.site.cover.SiteService;
@@ -83,9 +81,21 @@ import org.sakaiproject.user.api.User;
 import org.sakaiproject.user.cover.UserDirectoryService;
 import org.sakaiproject.util.FormattedText;
 import org.sakaiproject.util.ResourceLoader;
-
 import org.springframework.context.ApplicationContext;
 import org.springframework.web.context.support.WebApplicationContextUtils;
+import org.tsugi.basiclti.BasicLTIConstants;
+import org.tsugi.basiclti.BasicLTIUtil;
+import org.tsugi.contentitem.objects.ContentItemResponse;
+
+import lombok.extern.slf4j.Slf4j;
+import net.oauth.OAuth;
+import net.oauth.OAuthAccessor;
+import net.oauth.OAuthConsumer;
+import net.oauth.OAuthMessage;
+import net.oauth.OAuthValidator;
+import net.oauth.SimpleOAuthValidator;
+import net.oauth.server.OAuthServlet;
+import net.oauth.signature.OAuthSignatureMethod;
 
 /**
  * Notes:
@@ -299,7 +309,9 @@ public class ProviderServlet extends HttpServlet {
 				Map session_payload = (Map) sess.getAttribute("payload");
 				if ( session_payload != null ) {
 					// Post-Login requests to content.item
-					log.debug("ContentItem already logged in {}", sess.getUserId());
+					log.debug("ContentItem already logged in {}", sess.getUserId());					
+
+					System.out.println("LTINWU - ProviderServlet.doPost session_payload = " + session_payload);
 					handleContentItem(request, response, session_payload);
 					return;
 				}

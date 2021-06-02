@@ -19,34 +19,42 @@
 
 package org.tsugi.basiclti;
 
+import static org.tsugi.basiclti.BasicLTIConstants.CUSTOM_PREFIX;
+import static org.tsugi.basiclti.BasicLTIConstants.LTI_MESSAGE_TYPE;
 import static org.tsugi.basiclti.BasicLTIConstants.LTI_MESSAGE_TYPE_BASICLTILAUNCHREQUEST;
 import static org.tsugi.basiclti.BasicLTIConstants.LTI_MESSAGE_TYPE_CONTENTITEMSELECTIONREQUEST;
 import static org.tsugi.basiclti.BasicLTIConstants.LTI_VERSION;
 import static org.tsugi.basiclti.BasicLTIConstants.LTI_VERSION_1;
-import static org.tsugi.basiclti.BasicLTIConstants.CUSTOM_PREFIX;
-import static org.tsugi.basiclti.BasicLTIConstants.LTI_MESSAGE_TYPE;
 import static org.tsugi.basiclti.BasicLTIConstants.TOOL_CONSUMER_INSTANCE_CONTACT_EMAIL;
 import static org.tsugi.basiclti.BasicLTIConstants.TOOL_CONSUMER_INSTANCE_DESCRIPTION;
 import static org.tsugi.basiclti.BasicLTIConstants.TOOL_CONSUMER_INSTANCE_GUID;
 import static org.tsugi.basiclti.BasicLTIConstants.TOOL_CONSUMER_INSTANCE_NAME;
 import static org.tsugi.basiclti.BasicLTIConstants.TOOL_CONSUMER_INSTANCE_URL;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Date;
-import java.util.TimeZone;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
+import java.util.TimeZone;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import java.text.SimpleDateFormat;
-
 import javax.servlet.http.HttpServletRequest;
 
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+
+import lombok.extern.slf4j.Slf4j;
 import net.oauth.OAuth;
 import net.oauth.OAuthAccessor;
 import net.oauth.OAuthConsumer;
@@ -55,19 +63,6 @@ import net.oauth.OAuthValidator;
 import net.oauth.SimpleOAuthValidator;
 import net.oauth.server.OAuthServlet;
 import net.oauth.signature.OAuthSignatureMethod;
-
-import java.net.HttpURLConnection;
-import java.net.URL;
-
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-
-import lombok.extern.slf4j.Slf4j;
-
-import org.json.simple.JSONArray;
-import org.json.simple.JSONObject;
-import org.json.simple.JSONValue;
 
 /* Leave out until we have JTidy 0.8 in the repository 
  import org.w3c.tidy.Tidy;
@@ -621,6 +616,7 @@ public class BasicLTIUtil {
 		}
 
 		String htmltext = text.toString();
+		System.out.println("LTINWU - BasicLTIUtil.postLaunchHTML - htmltext: " + htmltext);
 		return htmltext;
 	}
 

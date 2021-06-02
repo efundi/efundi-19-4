@@ -19,38 +19,29 @@
 
 package org.sakaiproject.blti;
 
+import static org.sakaiproject.basiclti.util.SakaiBLTIUtil.BASICLTI_PORTLET_ALLOWROSTER;
+import static org.sakaiproject.basiclti.util.SakaiBLTIUtil.BASICLTI_PORTLET_ALLOWSETTINGS;
+import static org.sakaiproject.basiclti.util.SakaiBLTIUtil.BASICLTI_PORTLET_ASSIGNMENT;
+import static org.sakaiproject.basiclti.util.SakaiBLTIUtil.BASICLTI_PORTLET_ON;
+import static org.sakaiproject.basiclti.util.SakaiBLTIUtil.BASICLTI_PORTLET_TOOLSETTING;
+
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.util.Collection;
-import java.util.List;
 import java.util.ArrayList;
-import java.util.Map;
+import java.util.Collection;
 import java.util.HashMap;
-import java.util.TreeMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.Iterator;
+import java.util.TreeMap;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
-import lombok.extern.slf4j.Slf4j;
-
-import net.oauth.OAuthAccessor;
-import net.oauth.OAuthConsumer;
-import net.oauth.OAuthMessage;
-import net.oauth.OAuthValidator;
-import net.oauth.SimpleOAuthValidator;
-import net.oauth.server.OAuthServlet;
-import net.oauth.signature.OAuthSignatureMethod;
-
-import org.tsugi.basiclti.BasicLTIConstants;
-import org.tsugi.basiclti.BasicLTIUtil;
-import org.tsugi.basiclti.XMLMap;
-import org.tsugi.pox.IMSPOXRequest;
 
 import org.sakaiproject.authz.api.AuthzGroupService;
 import org.sakaiproject.authz.api.Member;
@@ -63,18 +54,24 @@ import org.sakaiproject.lti.api.LTIService;
 import org.sakaiproject.site.api.Group;
 import org.sakaiproject.site.api.Site;
 import org.sakaiproject.site.api.ToolConfiguration;
-import org.sakaiproject.user.api.User;
 import org.sakaiproject.site.cover.SiteService;
+import org.sakaiproject.user.api.User;
 import org.sakaiproject.user.cover.UserDirectoryService;
 import org.sakaiproject.util.FormattedText;
 import org.sakaiproject.util.ResourceLoader;
+import org.tsugi.basiclti.BasicLTIConstants;
+import org.tsugi.basiclti.BasicLTIUtil;
+import org.tsugi.basiclti.XMLMap;
+import org.tsugi.pox.IMSPOXRequest;
 
-import static org.sakaiproject.basiclti.util.SakaiBLTIUtil.BASICLTI_PORTLET_ALLOWROSTER;
-import static org.sakaiproject.basiclti.util.SakaiBLTIUtil.BASICLTI_PORTLET_ALLOWSETTINGS;
-import static org.sakaiproject.basiclti.util.SakaiBLTIUtil.BASICLTI_PORTLET_ON;
-import static org.sakaiproject.basiclti.util.SakaiBLTIUtil.BASICLTI_PORTLET_OFF;
-import static org.sakaiproject.basiclti.util.SakaiBLTIUtil.BASICLTI_PORTLET_TOOLSETTING;
-import static org.sakaiproject.basiclti.util.SakaiBLTIUtil.BASICLTI_PORTLET_ASSIGNMENT;
+import lombok.extern.slf4j.Slf4j;
+import net.oauth.OAuthAccessor;
+import net.oauth.OAuthConsumer;
+import net.oauth.OAuthMessage;
+import net.oauth.OAuthValidator;
+import net.oauth.SimpleOAuthValidator;
+import net.oauth.server.OAuthServlet;
+import net.oauth.signature.OAuthSignatureMethod;
 
 /**
  * Notes:
@@ -471,6 +468,7 @@ public class ServiceServlet extends HttpServlet {
 		String theXml = XMLMap.getXML(theMap, true);
 		PrintWriter out = response.getWriter();
 		out.println(theXml);
+		System.out.println("LTINWU - ServiceServlet.processSettings - theXml: " + theXml);
 	}
 
 	protected void processOutcome(HttpServletRequest request, HttpServletResponse response,
@@ -530,6 +528,9 @@ public class ServiceServlet extends HttpServlet {
 		if ( ! success ) return;
 
 		String theXml = XMLMap.getXML(theMap, true);
+
+		System.out.println("LTINWU - ServiceServlet.processOutcome - theXml: " + theXml);
+		
 		PrintWriter out = response.getWriter();
 		out.println(theXml);
 	}
@@ -652,7 +653,8 @@ public class ServiceServlet extends HttpServlet {
 		response.setContentType("text/xml");
 		PrintWriter out = response.getWriter();
 		out.println(theXml);
-		log.debug(theXml);
+//		log.debug(theXml);
+		System.out.println("LTINWU - ServiceServlet.processRoster - theXml: " + theXml);
 	}
 
 	/* IMS POX XML versions of this service */
@@ -954,7 +956,8 @@ public class ServiceServlet extends HttpServlet {
 		response.setContentType("application/xml");
 		PrintWriter out = response.getWriter();
 		out.println(output);
-		log.debug(output);
+//		log.debug(output);
+		System.out.println("LTINWU - ServiceServlet.processOutcomeXml - output: " + output);
 	}
 
 

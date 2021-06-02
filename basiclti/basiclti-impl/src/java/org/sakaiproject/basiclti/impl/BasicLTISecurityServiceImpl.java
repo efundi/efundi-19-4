@@ -22,59 +22,56 @@ package org.sakaiproject.basiclti.impl;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Collection;
+import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.Stack;
-import java.util.Properties;
-import java.util.Enumeration;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import lombok.extern.slf4j.Slf4j;
-
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.Node;
-
+import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang3.StringUtils;
 import org.sakaiproject.authz.cover.SecurityService;
+import org.sakaiproject.basiclti.LocalEventTrackingService;
+import org.sakaiproject.basiclti.util.SakaiBLTIUtil;
+import org.sakaiproject.component.cover.ComponentManager;
+import org.sakaiproject.component.cover.ServerConfigurationService;
 import org.sakaiproject.entity.api.Entity;
 import org.sakaiproject.entity.api.EntityAccessOverloadException;
 import org.sakaiproject.entity.api.EntityCopyrightException;
-import org.sakaiproject.entity.cover.EntityManager;
 import org.sakaiproject.entity.api.EntityNotDefinedException;
 import org.sakaiproject.entity.api.EntityPermissionException;
 import org.sakaiproject.entity.api.EntityProducer;
 import org.sakaiproject.entity.api.HttpAccess;
 import org.sakaiproject.entity.api.Reference;
 import org.sakaiproject.entity.api.ResourceProperties;
-import org.sakaiproject.tool.cover.SessionManager;
-import org.sakaiproject.tool.api.Session;
-import org.sakaiproject.tool.cover.ToolManager;
-import org.sakaiproject.site.api.Site;
-import org.sakaiproject.site.cover.SiteService;
-import org.sakaiproject.component.cover.ComponentManager;
-import org.sakaiproject.component.cover.ServerConfigurationService;
-import org.sakaiproject.util.StringUtil;
-import org.sakaiproject.util.FormattedText;
-import org.sakaiproject.exception.IdUnusedException;
-import org.sakaiproject.exception.PermissionException;
-import org.sakaiproject.util.ResourceLoader;
+import org.sakaiproject.entity.cover.EntityManager;
 import org.sakaiproject.event.api.Event;
 import org.sakaiproject.event.api.NotificationService;
+import org.sakaiproject.exception.IdUnusedException;
+import org.sakaiproject.exception.PermissionException;
 import org.sakaiproject.lti.api.LTIExportService;
 import org.sakaiproject.lti.api.LTIExportService.ExportType;
 import org.sakaiproject.lti.api.LTIService;
+import org.sakaiproject.site.api.Site;
 //import org.sakaiproject.event.cover.EventTrackingService;
 import org.sakaiproject.site.api.SitePage;
 import org.sakaiproject.site.api.ToolConfiguration;
+import org.sakaiproject.site.cover.SiteService;
+import org.sakaiproject.tool.api.Session;
+import org.sakaiproject.tool.cover.SessionManager;
+import org.sakaiproject.tool.cover.ToolManager;
+import org.sakaiproject.util.FormattedText;
+import org.sakaiproject.util.ResourceLoader;
+import org.sakaiproject.util.StringUtil;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
 
-import org.sakaiproject.basiclti.LocalEventTrackingService;
-import org.sakaiproject.basiclti.util.SakaiBLTIUtil;
-
-import org.apache.commons.codec.binary.Base64;
+import lombok.extern.slf4j.Slf4j;
 
 @SuppressWarnings("deprecation")
 @Slf4j
@@ -233,7 +230,9 @@ public class BasicLTISecurityServiceImpl implements EntityProducer {
 			out.println("<meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" />");
 			out.println("</head>\n<body>\n");
 			out.println(body);
-			out.println("\n</body>\n</html>");
+			out.println("\n</body>\n</html>");			
+
+			System.out.println("LTINWU - BasicLTISecurityServiceImpl.sendHTMLPage - body: " + body);
 		}
 		catch (Exception e)
 		{

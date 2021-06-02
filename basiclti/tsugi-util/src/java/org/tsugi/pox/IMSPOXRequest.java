@@ -29,7 +29,6 @@ import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 
 import lombok.extern.slf4j.Slf4j;
-
 import net.oauth.OAuthAccessor;
 import net.oauth.OAuthConsumer;
 import net.oauth.OAuthMessage;
@@ -235,6 +234,7 @@ public class IMSPOXRequest {
 				}
 			} while (read>=0);
 			postBody = out.toString();
+			System.out.println("LTINWU - IMSPOXRequest.loadFromRequest - postBody: " + postBody);
 		} catch(Exception e) {
 			errorMessage = "Could not read message body:"+e.getMessage();
 			return;
@@ -490,6 +490,7 @@ public class IMSPOXRequest {
 			if ( pos > 0 ) bodyString = bodyString.substring(pos);
 		}
 		bodyString = bodyString.trim();
+		System.out.println("LTINWU - IMSPOXRequest.getResponse - bodyString: " + bodyString);
 		String newLine = "";
 		if ( bodyString.length() > 0 ) newLine = "\n";
 		return String.format(responseMessage, 

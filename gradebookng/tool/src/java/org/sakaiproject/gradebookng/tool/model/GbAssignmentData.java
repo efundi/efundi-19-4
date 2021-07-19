@@ -1,5 +1,8 @@
 package org.sakaiproject.gradebookng.tool.model;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.apache.wicket.util.io.IClusterable;
 
 import lombok.Data;
@@ -12,25 +15,13 @@ import lombok.Data;
 @Data
 public class GbAssignmentData implements IClusterable {
 	
+	private static final long serialVersionUID = 1L;
+
 	private boolean selected;
 
 	private String assignmentId;
 
 	private String assignmentName;
-
-	// private List<Assignment> assignments;
-	//
-	// private GradebookUiSettings uiSettings;
-	//
-	// public GbAssignmentData(final GradebookNgBusinessService businessService,
-	// final GradebookUiSettings settings) {
-	//
-	// uiSettings = settings;
-	// SortType sortBy = SortType.SORT_BY_SORTING;
-	// if (settings.isCategoriesEnabled() && settings.isGroupedByCategory()) {
-	// // Pre-sort assignments by the categorized sort order
-	// sortBy = SortType.SORT_BY_CATEGORY;
-	// }
-	// assignments = businessService.getGradebookAssignments(sortBy);
-	// }
+	
+	private List<GbStudentInfoData> studentInfoDataList = new ArrayList<GbStudentInfoData>();
 }

@@ -1,9 +1,22 @@
 package org.sakaiproject.gradebookng.tool.model;
 
-import java.io.Serializable;
+import org.apache.wicket.util.io.IClusterable;
 
-public class GbStudentInfoData implements Serializable {
+import lombok.Data;
+
+/**
+ * GbStudentInfoData
+ *
+ * @author Joseph Gillman
+ */
+@Data
+public class GbStudentInfoData implements IClusterable {
 
 	private static final long serialVersionUID = 1L;
 
+	private String userId;
+
+	private String status;
+
+	private String errorMessage;
 }

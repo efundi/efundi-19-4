@@ -2,24 +2,15 @@
 <html xmlns:wicket="http://wicket.apache.org">
 
 <body>
-<wicket:panel>
+	<wicket:panel>
 
-	<div class="panel panel-default">
-		<div class="panel-heading" role="tab" id="settingsStatisticsHeader">
-			<h3 class="panel-title">
-				<a role="button" data-toggle="collapse" href="#settingsStatistics" aria-expanded="false" aria-controls="settingsStatistics">
-					<wicket:message key="settingspage.statistics.heading">Statistics</wicket:message>
-				</a>
-			</h3>
+		<div class="act">
+			<input type="submit" wicket:id="student-info-close" class="btn btn-primary"
+				wicket:message="value:button.studentInfoClose" />
 		</div>
-		<div wicket:id="settingsStatisticsPanel" id="settingsStatistics" class="panel-collapse collapse" role="tabpanel" aria-labelledby="settingsStatisticsHeader">
-			<div class="panel-body">
-				
 
-			</div>
-		</div>
-	</div>
+		<table wicket:id="student-info-table" class="dataview"></table>
 
-</wicket:panel>
+	</wicket:panel>
 </body>
 </html>

@@ -9,6 +9,7 @@ import org.apache.wicket.extensions.markup.html.repeater.data.table.NoRecordsToo
 import org.apache.wicket.extensions.markup.html.repeater.data.table.PropertyColumn;
 import org.apache.wicket.markup.head.CssHeaderItem;
 import org.apache.wicket.markup.head.IHeaderResponse;
+import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.markup.html.link.Link;
 import org.apache.wicket.model.Model;
 import org.apache.wicket.request.resource.CssResourceReference;
@@ -24,6 +25,8 @@ import org.sakaiproject.gradebookng.tool.pages.NWUMPSPage;
  *
  */
 public class NWUMPSStudentInfoPanel extends BasePanel {
+
+	private static final String NWU_ITHELP_URL = "nwu.ithelp.url";
 
 	private static final long serialVersionUID = 1L;
 	
@@ -41,6 +44,13 @@ public class NWUMPSStudentInfoPanel extends BasePanel {
 		StudentInfoDataProvider studentInfoDataProvider = new StudentInfoDataProvider(assignmentData);
 		AjaxFallbackDefaultDataTable studentInfoTable = new AjaxFallbackDefaultDataTable<>("student-info-table", getColumns(), studentInfoDataProvider, 100);
 		studentInfoTable.addBottomToolbar(new NoRecordsToolbar(studentInfoTable));
+		
+		String helpUrl = serverConfigService.getString(NWU_ITHELP_URL, "http://ithelp.nwu.ac.za");
+		StringBuilder labelValue = new StringBuilder("Help: Please create a <a href=\"");
+		labelValue.append(helpUrl);
+		labelValue.append("\">support request</a> and add the sitename and testname with the error");
+		
+		add(new Label("itHelpURL", labelValue.toString()));
 				
 		add(new Link<Void>("student-info-close") {
 			private static final long serialVersionUID = 1L;

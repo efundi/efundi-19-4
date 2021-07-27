@@ -3,6 +3,7 @@ package org.sakaiproject.gradebookng.tool.pages;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.commons.compress.utils.Lists;
 import org.apache.wicket.AttributeModifier;
@@ -26,11 +27,13 @@ import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.Model;
 import org.apache.wicket.model.PropertyModel;
 import org.apache.wicket.request.resource.CssResourceReference;
+import org.sakaiproject.gradebookng.business.model.GbGroup;
 import org.sakaiproject.gradebookng.business.util.AssignmentDataProvider;
 import org.sakaiproject.gradebookng.tool.model.GbAssignmentData;
 import org.sakaiproject.gradebookng.tool.panels.NWUMPSStudentInfoPanel;
 import org.sakaiproject.service.gradebook.shared.Assignment;
-import org.sakaiproject.service.gradebook.shared.GradebookInformation;
+
+import za.ac.nwu.NWUGradebookPublishUtil;
 
 /**
  * NWU MPS Page
@@ -55,7 +58,7 @@ public class NWUMPSPage extends BasePage {
 		super.onInitialize();
 
 		// get settings data
-		final GradebookInformation settings = this.businessService.getGradebookSettings();
+//		final GradebookInformation settings = businessService.getGradebookSettings();
 
 		// setup page model
 //		final GbSettings gbSettings = new GbSettings(settings);
@@ -69,11 +72,22 @@ public class NWUMPSPage extends BasePage {
 				//Publish marks for selected sites
 				System.out.println("Send Marks to MPS");
 				
-//				assignmentPanel.getSelectedAssignments
+				List<String> selectedAssignmentIds = selectedAssignments.stream().map(GbAssignmentData::getAssignmentId).collect(Collectors.toList());
 				
-				for (GbAssignmentData gbAssignmentData : selectedAssignments) {
-					System.out.println("selected assignments " + gbAssignmentData);
-				}				
+				NWUGradebookPublishUtil gradebookPublishUtil = new NWUGradebookPublishUtil();
+				
+				
+				List<GbGroup> gbGroupList = businessService.getSiteSectionsAndGroups();
+				for (GbGroup gbGroup : gbGroupList) {
+					gbGroup.getReference();
+				}
+				
+//				gradebookPublishUtil.publishGradebookDataToMPS(businessService.getCurrentSiteId(), selectedAssignmentIds);
+				
+				
+//				for (GbAssignmentData gbAssignmentData : selectedAssignments) {
+//					System.out.println("selected assignments " + gbAssignmentData);
+//				}				
 			}
 		};
 		form.add(current);
@@ -135,7 +149,7 @@ public class NWUMPSPage extends BasePage {
 			// get the list of Assignments
 			final List<Assignment> assignments = businessService.getGradebookAssignments();
 
-			AssignmentDataProvider assignmentDataProvider = new AssignmentDataProvider(assignments);
+			AssignmentDataProvider assignmentDataProvider = new AssignmentDataProvider(businessService.getCurrentSiteId(), assignments);
 			AjaxFallbackDefaultDataTable assignmentsTable = new AjaxFallbackDefaultDataTable<>("assignments-table", getColumns(), assignmentDataProvider, 25);
 			assignmentsTable.addBottomToolbar(new NoRecordsToolbar(assignmentsTable));
 					

@@ -1,6 +1,6 @@
 package za.ac.nwu;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -41,12 +41,12 @@ public class NWUGradebookRecord {
     private double totalMark;
 
 //	@EqualsAndHashCode.Include
-    private int gradableObjectId;
+    private Long gradableObjectId;
 
-    private Date recordedDate;
-    private Date dueDate;
-    private Date createdDate;    
-    private Date modifiedDate;
+    private LocalDateTime recordedDate;
+    private LocalDateTime dueDate;
+    private LocalDateTime createdDate;    
+    private LocalDateTime modifiedDate;
 
 //	@EqualsAndHashCode.Include
     private String status;

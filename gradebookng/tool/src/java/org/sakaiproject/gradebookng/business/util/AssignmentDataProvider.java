@@ -15,9 +15,11 @@ import org.apache.wicket.extensions.markup.html.repeater.util.SortableDataProvid
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.Model;
 import org.sakaiproject.gradebookng.tool.model.GbAssignmentData;
+import org.sakaiproject.gradebookng.tool.model.GbStudentInfoData;
 import org.sakaiproject.service.gradebook.shared.Assignment;
 
 import za.ac.nwu.NWUGradebookPublishUtil;
+import za.ac.nwu.NWUGradebookRecord;
 
 /**
  * @author dev
@@ -38,7 +40,7 @@ public class AssignmentDataProvider extends SortableDataProvider<GbAssignmentDat
         
 		List<Long> assignmentIds = assignments.stream().map(Assignment::getId).collect(Collectors.toList());		
 		NWUGradebookPublishUtil gradebookPublishUtil = new NWUGradebookPublishUtil(siteId, assignmentIds);
-		Map<Long, List> studentInfoMap = gradebookPublishUtil.getStudentInfoMap();
+		Map<Long, List<NWUGradebookRecord>> studentInfoMap = gradebookPublishUtil.getStudentInfoMap();
 				
 		GbAssignmentData gbAssignmentData = null;
 		assignmentList = new ArrayList<GbAssignmentData>();
@@ -54,10 +56,33 @@ public class AssignmentDataProvider extends SortableDataProvider<GbAssignmentDat
 				gbAssignmentData = new GbAssignmentData();
 				gbAssignmentData.setAssignmentId(Long.toString(assignment.getId()));
 				gbAssignmentData.setAssignmentName(assignment.getName());
-				gbAssignmentData.setStudentInfoDataList(studentInfoMap.get(assignment.getId()));
+				
+				if(studentInfoMap.get(assignment.getId()) == null) {
+					gbAssignmentData.setStudentInfoDataList(new ArrayList<GbStudentInfoData>());
+				} else {
+					gbAssignmentData.setStudentInfoDataList(convertToGbStudentInfoDataList(studentInfoMap.get(assignment.getId())));
+				}
+				
 				assignmentList.add(gbAssignmentData);
 			}
 		}
+	}
+
+	/**
+	 * 
+	 * @param gradebookRecordList
+	 * @return
+	 */
+	private List<GbStudentInfoData> convertToGbStudentInfoDataList(List<NWUGradebookRecord> gradebookRecordList) {
+		List<GbStudentInfoData> studentInfoDataList = new ArrayList<GbStudentInfoData>();
+		GbStudentInfoData studentInfoData = null;
+		for (NWUGradebookRecord nwuGradebookRecord : gradebookRecordList) {
+			studentInfoData = new GbStudentInfoData();
+			studentInfoData.setUserId(nwuGradebookRecord.getStudentNumber());
+			studentInfoData.setStatus(nwuGradebookRecord.getStatus());
+			studentInfoData.setErrorMessage(nwuGradebookRecord.getDescription());
+		}
+		return studentInfoDataList;
 	}
 
 	@Override

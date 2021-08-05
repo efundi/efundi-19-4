@@ -56,7 +56,7 @@ public class NWUGradebookPublishUtil {
 	private static MetaInfo metaInfo = null;
 	private static ContextInfo contextInfo = new ContextInfo("EFUNDI");
 	private static CourseOfferingService courseOfferingService = null;
-	private Map<Long, List> studentInfoMap = null;
+	private Map<Long, List<NWUGradebookRecord>> studentInfoMap = null;
 	private static boolean initializeSuccess = false;
 
 	private final static String STUDENT_GRDB_MARKS_SELECT = "SELECT gr.STUDENT_ID, gr.POINTS_EARNED, gr.ID, gr.DATE_RECORDED, go.NAME, go.POINTS_POSSIBLE, go.DUE_DATE"
@@ -95,7 +95,7 @@ public class NWUGradebookPublishUtil {
 
 		try {
 			for (Long assignmentId : assignmentIds) {
-				studentInfoMap = new HashMap<Long, List>();
+				studentInfoMap = new HashMap<Long, List<NWUGradebookRecord>>();
 
 				// # Get matching data for students from NWU_GRADEBOOK_DATA
 				studentGBMarksInfoPrepStmt = connection.prepareStatement(NWU_GRDB_INFO_SELECT);
@@ -717,7 +717,7 @@ public class NWUGradebookPublishUtil {
 		}
 	}
 
-	public Map<Long, List> getStudentInfoMap() {
+	public Map<Long, List<NWUGradebookRecord>> getStudentInfoMap() {
 		return studentInfoMap;
 	}
 

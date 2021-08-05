@@ -2,6 +2,7 @@ package org.sakaiproject.gradebookng.tool.pages;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -27,7 +28,6 @@ import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.Model;
 import org.apache.wicket.model.PropertyModel;
 import org.apache.wicket.request.resource.CssResourceReference;
-import org.sakaiproject.gradebookng.business.model.GbGroup;
 import org.sakaiproject.gradebookng.business.util.AssignmentDataProvider;
 import org.sakaiproject.gradebookng.tool.model.GbAssignmentData;
 import org.sakaiproject.gradebookng.tool.panels.NWUMPSStudentInfoPanel;
@@ -73,21 +73,10 @@ public class NWUMPSPage extends BasePage {
 				System.out.println("Send Marks to MPS");
 				
 				List<String> selectedAssignmentIds = selectedAssignments.stream().map(GbAssignmentData::getAssignmentId).collect(Collectors.toList());
+				Map<String, List<String>> sectionUsersMap = businessService.getSectionUsersForCurrentSite();
 				
-				NWUGradebookPublishUtil gradebookPublishUtil = new NWUGradebookPublishUtil();
-				
-				
-				List<GbGroup> gbGroupList = businessService.getSiteSectionsAndGroups();
-				for (GbGroup gbGroup : gbGroupList) {
-					gbGroup.getReference();
-				}
-				
-//				gradebookPublishUtil.publishGradebookDataToMPS(businessService.getCurrentSiteId(), selectedAssignmentIds);
-				
-				
-//				for (GbAssignmentData gbAssignmentData : selectedAssignments) {
-//					System.out.println("selected assignments " + gbAssignmentData);
-//				}				
+				NWUGradebookPublishUtil gradebookPublishUtil = new NWUGradebookPublishUtil();		
+				gradebookPublishUtil.publishGradebookDataToMPS(businessService.getCurrentSiteId(), sectionUsersMap, selectedAssignmentIds);
 			}
 		};
 		form.add(current);

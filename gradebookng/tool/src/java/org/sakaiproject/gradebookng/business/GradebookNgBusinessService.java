@@ -37,13 +37,8 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
-import lombok.Getter;
-import lombok.Setter;
-import lombok.extern.slf4j.Slf4j;
-
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
-
 import org.sakaiproject.authz.api.Member;
 import org.sakaiproject.authz.api.SecurityAdvisor;
 import org.sakaiproject.authz.api.SecurityAdvisor.SecurityAdvice;
@@ -52,8 +47,6 @@ import org.sakaiproject.component.api.ServerConfigurationService;
 import org.sakaiproject.component.cover.ComponentManager;
 import org.sakaiproject.entity.api.ResourceProperties;
 import org.sakaiproject.entity.api.ResourcePropertiesEdit;
-import org.sakaiproject.section.api.coursemanagement.CourseSection;
-import org.sakaiproject.section.api.facade.Role;
 import org.sakaiproject.exception.IdUnusedException;
 import org.sakaiproject.exception.IdUsedException;
 import org.sakaiproject.exception.InUseException;
@@ -77,7 +70,9 @@ import org.sakaiproject.gradebookng.tool.model.GradebookUiSettings;
 import org.sakaiproject.rubrics.logic.RubricsConstants;
 import org.sakaiproject.rubrics.logic.RubricsService;
 import org.sakaiproject.section.api.SectionManager;
+import org.sakaiproject.section.api.coursemanagement.CourseSection;
 import org.sakaiproject.section.api.coursemanagement.EnrollmentRecord;
+import org.sakaiproject.section.api.facade.Role;
 import org.sakaiproject.service.gradebook.shared.AssessmentNotFoundException;
 import org.sakaiproject.service.gradebook.shared.Assignment;
 import org.sakaiproject.service.gradebook.shared.CategoryDefinition;
@@ -111,6 +106,10 @@ import org.sakaiproject.user.api.UserDirectoryService;
 import org.sakaiproject.user.api.UserNotDefinedException;
 import org.sakaiproject.util.FormattedText;
 import org.sakaiproject.util.ResourceLoader;
+
+import lombok.Getter;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Business service for GradebookNG
@@ -1071,6 +1070,30 @@ public class GradebookNgBusinessService {
 			}
 		}
 		return userSections;
+	}
+	
+	/**
+	 * 
+	 * @return
+	 */
+	public Map<String, List<String>> getSectionUsersForCurrentSite() {
+		
+		Map<String, List<String>> sectionUsers = new HashMap<>();
+		List<String> userIdList = null;
+		for (CourseSection cs : sectionManager.getSections(getCurrentSiteId())) {
+			
+			List<EnrollmentRecord> enrollmentRecordList = sectionManager.getSectionEnrollments(cs.getUuid());
+			if(enrollmentRecordList != null && !enrollmentRecordList.isEmpty()) {
+				
+				userIdList = new ArrayList<String>();
+				for (EnrollmentRecord er : enrollmentRecordList) {
+					String userId = er.getUser().getUserUid();// ??? is this correct?
+					userIdList.add(userId);
+				}
+				sectionUsers.put(cs.getTitle(), userIdList);
+			}
+		}
+		return sectionUsers;
 	}
 
 	/**

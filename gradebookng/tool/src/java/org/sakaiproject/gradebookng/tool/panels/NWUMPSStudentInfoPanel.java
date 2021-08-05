@@ -7,9 +7,10 @@ import org.apache.wicket.extensions.ajax.markup.html.repeater.data.table.AjaxFal
 import org.apache.wicket.extensions.markup.html.repeater.data.table.IColumn;
 import org.apache.wicket.extensions.markup.html.repeater.data.table.NoRecordsToolbar;
 import org.apache.wicket.extensions.markup.html.repeater.data.table.PropertyColumn;
+import org.apache.wicket.markup.ComponentTag;
 import org.apache.wicket.markup.head.CssHeaderItem;
 import org.apache.wicket.markup.head.IHeaderResponse;
-import org.apache.wicket.markup.html.basic.Label;
+import org.apache.wicket.markup.html.link.ExternalLink;
 import org.apache.wicket.markup.html.link.Link;
 import org.apache.wicket.model.Model;
 import org.apache.wicket.request.resource.CssResourceReference;
@@ -45,12 +46,18 @@ public class NWUMPSStudentInfoPanel extends BasePanel {
 		AjaxFallbackDefaultDataTable studentInfoTable = new AjaxFallbackDefaultDataTable<>("student-info-table", getColumns(), studentInfoDataProvider, 100);
 		studentInfoTable.addBottomToolbar(new NoRecordsToolbar(studentInfoTable));
 		
-		String helpUrl = serverConfigService.getString(NWU_ITHELP_URL, "http://ithelp.nwu.ac.za");
-		StringBuilder labelValue = new StringBuilder("Help: Please create a <a href=\"");
-		labelValue.append(helpUrl);
-		labelValue.append("\">support request</a> and add the sitename and testname with the error");
-		
-		add(new Label("itHelpURL", labelValue.toString()));
+		String helpUrl = serverConfigService.getString(NWU_ITHELP_URL, "http://ithelp.nwu.ac.za");		
+		add(new ExternalLink("itHelpURL_link", helpUrl) {
+
+            private static final long serialVersionUID = -8010560272317354356L;
+
+            @Override
+            protected void onComponentTag(ComponentTag tag)
+            {
+                super.onComponentTag(tag);
+                tag.put("target", "_blank");
+            }
+		});
 				
 		add(new Link<Void>("student-info-close") {
 			private static final long serialVersionUID = 1L;
@@ -58,11 +65,6 @@ public class NWUMPSStudentInfoPanel extends BasePanel {
 			@Override
 			public void onClick() {
 				setResponsePage(NWUMPSPage.class);
-			}
-
-			@Override
-			public boolean isVisible() {
-				return (businessService.isUserAbleToEditAssessments());
 			}
 		});		
 		add(studentInfoTable);

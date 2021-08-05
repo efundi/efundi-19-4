@@ -1087,7 +1087,7 @@ public class GradebookNgBusinessService {
 				
 				userIdList = new ArrayList<String>();
 				for (EnrollmentRecord er : enrollmentRecordList) {
-					String userId = er.getUser().getUserUid();// ??? is this correct?
+					String userId = er.getUser().getDisplayId();
 					userIdList.add(userId);
 				}
 				sectionUsers.put(cs.getTitle(), userIdList);

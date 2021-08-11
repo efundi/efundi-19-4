@@ -1077,12 +1077,11 @@ public class GradebookNgBusinessService {
 	 * @return
 	 */
 	public Map<String, List<String>> getSectionUsersForCurrentSite() {
-		
-		Map<String, List<String>> sectionUsers = new HashMap<>();
+		Map<String, List<String>> sectionEnrollmentsMap = new HashMap<>();
 		List<String> userIdList = null;
 		for (CourseSection cs : sectionManager.getSections(getCurrentSiteId())) {
 			
-			List<EnrollmentRecord> enrollmentRecordList = sectionManager.getSectionEnrollments(cs.getUuid());
+			List<EnrollmentRecord> enrollmentRecordList = sectionManager.getSectionEnrollmentsForNWU(cs.getUuid());
 			if(enrollmentRecordList != null && !enrollmentRecordList.isEmpty()) {
 				
 				userIdList = new ArrayList<String>();
@@ -1090,10 +1089,10 @@ public class GradebookNgBusinessService {
 					String userId = er.getUser().getDisplayId();
 					userIdList.add(userId);
 				}
-				sectionUsers.put(cs.getTitle(), userIdList);
+				sectionEnrollmentsMap.put(cs.getTitle(), userIdList);
 			}
 		}
-		return sectionUsers;
+		return sectionEnrollmentsMap;
 	}
 
 	/**

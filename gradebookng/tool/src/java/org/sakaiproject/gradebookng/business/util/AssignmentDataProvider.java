@@ -81,6 +81,7 @@ public class AssignmentDataProvider extends SortableDataProvider<GbAssignmentDat
 			studentInfoData.setUserId(nwuGradebookRecord.getStudentNumber());
 			studentInfoData.setStatus(nwuGradebookRecord.getStatus());
 			studentInfoData.setErrorMessage(nwuGradebookRecord.getDescription());
+			studentInfoDataList.add(studentInfoData);
 		}
 		return studentInfoDataList;
 	}

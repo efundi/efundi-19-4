@@ -1,6 +1,5 @@
 package za.ac.nwu;
 
-import java.sql.Array;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -61,7 +60,7 @@ public class NWUGradebookPublishUtil {
 
 	private final static String STUDENT_GRDB_MARKS_SELECT = "SELECT gr.STUDENT_ID, gr.POINTS_EARNED, gr.ID, gr.DATE_RECORDED, go.NAME, go.POINTS_POSSIBLE, go.DUE_DATE"
 			+ " FROM gb_grade_record_t gr JOIN gb_gradable_object_t go ON go.ID = gr.GRADABLE_OBJECT_ID JOIN gb_grade_map_t gm ON gm.GRADEBOOK_ID = go.GRADEBOOK_ID JOIN gb_gradebook_t g ON "
-			+ "g.SELECTED_GRADE_MAPPING_ID = gm.ID WHERE go.ID = ? g.NAME = ? AND go.DUE_DATE AND gr.STUDENT_ID IN (?) IS NOT NULL";
+			+ "g.SELECTED_GRADE_MAPPING_ID = gm.ID WHERE go.ID = ? g.NAME = ? AND go.DUE_DATE IS NOT NULL AND gr.STUDENT_ID IN (";
 
 	private final static String NWU_GRDB_RECORDS_SELECT = "SELECT * FROM NWU_GRADEBOOK_DATA WHERE SITE_ID = ? AND STUDENT_NUMBER = ? AND GRADABLE_OBJECT_ID = ? AND MODULE = ?";
 	private final static String NWU_GRDB_RECORDS_INSERT = "INSERT INTO NWU_GRADEBOOK_DATA (SITE_ID, SITE_TITLE, MODULE, ASSESSMENT_NAME, STUDENT_NUMBER, EVAL_DESCR_ID, GRADE, "
@@ -193,13 +192,23 @@ public class NWUGradebookPublishUtil {
 
 				for (String assignmentId : assignmentIds) {
 
-					// # Get all student numbers and their grades for siteId and the date recorded between start and end date
-					studentGradebookMarksPrepStmt = connection.prepareStatement(STUDENT_GRDB_MARKS_SELECT);
-					studentGradebookMarksPrepStmt.setInt(1, Integer.parseInt(assignmentId));
-					studentGradebookMarksPrepStmt.setString(2, siteId);
+					// # Get all student numbers and their grades for siteId and the date recorded between start and end date					
+					StringBuilder sbSql = new StringBuilder();
+					sbSql.append(STUDENT_GRDB_MARKS_SELECT);					
+					
+					for( int i = 0; i < studentNumbersForModule.size(); i++ ) {
+					  if( i > 0 ) sbSql.append( "," );
+					  sbSql.append( " ?" );
+					}
+					sbSql.append( " ) " );
+					studentGradebookMarksPrepStmt = connection.prepareStatement( sbSql.toString() );
+					int counter = 1;
+					studentGradebookMarksPrepStmt.setInt(counter++, Integer.parseInt(assignmentId));
+					studentGradebookMarksPrepStmt.setString(counter++, siteId);
 
-					Array studentIdsInArray = connection.createArrayOf("VARCHAR", studentNumbersForModule.toArray());
-					studentGradebookMarksPrepStmt.setArray(3, studentIdsInArray);
+					for( int i = 0; i < studentNumbersForModule.size(); i++ ) {
+						studentGradebookMarksPrepStmt.setString(counter++, studentNumbersForModule.get(i) );
+					}
 					studentGradebookMarksResultSet = studentGradebookMarksPrepStmt.executeQuery();
 					while (studentGradebookMarksResultSet.next()) {
 

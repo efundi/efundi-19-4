@@ -57,13 +57,6 @@ public class NWUMPSPage extends BasePage {
 	public void onInitialize() {
 		super.onInitialize();
 
-		// get settings data
-//		final GradebookInformation settings = businessService.getGradebookSettings();
-
-		// setup page model
-//		final GbSettings gbSettings = new GbSettings(settings);
-//		final CompoundPropertyModel<GbSettings> formModel = new CompoundPropertyModel<>(gbSettings);
-
 		Form form = new Form("mps-form") {
 			private static final long serialVersionUID = 1L;
 

@@ -435,6 +435,16 @@ public class NWUGradebookPublishUtil {
 			} catch (SQLException e) {
 				log.error("Could not update NWU Gradebook data for: siteId: " + siteId + "; studentNumber: " + studentNumber
 						+ "; module: " + module, e);
+			} finally {
+
+				try {
+					if (nwuGradebookRecordsUpdateStatusPrepStmt != null && !nwuGradebookRecordsUpdateStatusPrepStmt.isClosed()) {
+						nwuGradebookRecordsUpdateStatusPrepStmt.close();
+					}
+				} catch (SQLException e) {
+					log.error("Could not be update MPS Gradebook Records, see error log for siteId: " + siteId + "; module: "
+							+ module, e);
+				}
 			}
 		}
 	}
@@ -470,6 +480,16 @@ public class NWUGradebookPublishUtil {
 		} catch (SQLException e) {
 			log.error("Could not update NWU Gradebook data for: siteId: " + siteId + "; studentNumber: " + studentNumber
 					+ "; module: " + module, e);
+		} finally {
+
+			try {
+				if (nwuGradebookRecordsUpdateStatusPrepStmt != null && !nwuGradebookRecordsUpdateStatusPrepStmt.isClosed()) {
+					nwuGradebookRecordsUpdateStatusPrepStmt.close();
+				}
+			} catch (SQLException e) {
+				log.error("Could not be update MPS Gradebook Records, see error log for siteId: " + siteId + "; module: "
+						+ module, e);
+			}
 		}
 	}
 
@@ -547,6 +567,15 @@ public class NWUGradebookPublishUtil {
 			}
 		} catch (SQLException e) {
 			log.error("Could not update NWU Gradebook data: ", e);
+		} finally {
+
+			try {
+				if (nwuGradebookRecordsUpdatePrepStmt != null && !nwuGradebookRecordsUpdatePrepStmt.isClosed()) {
+					nwuGradebookRecordsUpdatePrepStmt.close();
+				}
+			} catch (SQLException e) {
+				log.error("Could not be update MPS Gradebook Data, see error log for studentNumber: " + studentNumber, e);
+			}
 		}
 	}
 
@@ -599,6 +628,16 @@ public class NWUGradebookPublishUtil {
 		} catch (SQLException e) {
 			log.error("Could not insert NWU Gradebook data for: siteId: " + siteId + "; module: " + module + "; studentNumber: "
 					+ studentNumber + "; assessmentName: " + assessmentName, e);
+		} finally {
+
+			try {
+				if (nwuGradebookRecordsInsertPrepStmt != null && !nwuGradebookRecordsInsertPrepStmt.isClosed()) {
+					nwuGradebookRecordsInsertPrepStmt.close();
+				}
+			} catch (SQLException e) {
+				log.error("Could not insert NWU Gradebook data for: siteId: " + siteId + "; module: " + module + "; studentNumber: "
+						+ studentNumber + "; assessmentName: " + assessmentName, e);
+			}
 		}
 	}
 

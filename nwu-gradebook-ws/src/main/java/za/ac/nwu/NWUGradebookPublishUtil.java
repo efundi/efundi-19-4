@@ -58,9 +58,9 @@ public class NWUGradebookPublishUtil {
 	private Map<Long, List<NWUGradebookRecord>> studentInfoMap = null;
 	private static boolean initializeSuccess = false;
 
-	private final static String STUDENT_GRDB_MARKS_SELECT = "SELECT gr.STUDENT_ID, gr.POINTS_EARNED, gr.ID, gr.DATE_RECORDED, go.NAME, go.POINTS_POSSIBLE, go.DUE_DATE"
+	private final static String STUDENT_GRDB_MARKS_SELECT = "SELECT gr.STUDENT_ID, gr.POINTS_EARNED, gr.ID, gr.DATE_RECORDED, go.NAME, go.POINTS_POSSIBLE, go.DUE_DATE "
 			+ " FROM gb_grade_record_t gr JOIN gb_gradable_object_t go ON go.ID = gr.GRADABLE_OBJECT_ID JOIN gb_grade_map_t gm ON gm.GRADEBOOK_ID = go.GRADEBOOK_ID JOIN gb_gradebook_t g ON "
-			+ "g.SELECTED_GRADE_MAPPING_ID = gm.ID WHERE go.ID = ? g.NAME = ? AND go.DUE_DATE IS NOT NULL AND gr.STUDENT_ID IN (";
+			+ " g.SELECTED_GRADE_MAPPING_ID = gm.ID WHERE go.ID = ? AND g.NAME = ? AND go.DUE_DATE IS NOT NULL AND gr.STUDENT_ID IN (";
 
 	private final static String NWU_GRDB_RECORDS_SELECT = "SELECT * FROM NWU_GRADEBOOK_DATA WHERE SITE_ID = ? AND STUDENT_NUMBER = ? AND GRADABLE_OBJECT_ID = ? AND MODULE = ?";
 	private final static String NWU_GRDB_RECORDS_INSERT = "INSERT INTO NWU_GRADEBOOK_DATA (SITE_ID, SITE_TITLE, MODULE, ASSESSMENT_NAME, STUDENT_NUMBER, EVAL_DESCR_ID, GRADE, "

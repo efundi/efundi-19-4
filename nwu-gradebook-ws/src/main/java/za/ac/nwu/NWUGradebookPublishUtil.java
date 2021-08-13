@@ -202,6 +202,7 @@ public class NWUGradebookPublishUtil {
 					}
 					sbSql.append( " ) " );
 					studentGradebookMarksPrepStmt = connection.prepareStatement( sbSql.toString() );
+			        
 					int counter = 1;
 					studentGradebookMarksPrepStmt.setInt(counter++, Integer.parseInt(assignmentId));
 					studentGradebookMarksPrepStmt.setString(counter++, siteId);
@@ -210,51 +211,60 @@ public class NWUGradebookPublishUtil {
 						studentGradebookMarksPrepStmt.setString(counter++, studentNumbersForModule.get(i) );
 					}
 					studentGradebookMarksResultSet = studentGradebookMarksPrepStmt.executeQuery();
-					while (studentGradebookMarksResultSet.next()) {
+					
+					if (studentGradebookMarksResultSet.next() == false) {
+						System.out.println("ResultSet in empty");
 
-						studentNumber = studentGradebookMarksResultSet.getString("STUDENT_ID");
-						grade = studentGradebookMarksResultSet.getDouble("POINTS_EARNED");
+				        System.out.println(sbSql.toString());
+				        System.out.println(studentNumbersForModule);
+					} else {
 
-						recordedDate = studentGradebookMarksResultSet.getTimestamp("DATE_RECORDED").toLocalDateTime();
-						assessmentName = studentGradebookMarksResultSet.getString("NAME");
-						total = studentGradebookMarksResultSet.getDouble("POINTS_POSSIBLE");
-						dueDate = studentGradebookMarksResultSet.getTimestamp("DUE_DATE").toLocalDateTime();
-						gradableObjectId = studentGradebookMarksResultSet.getInt("ID");
-						// *******************
-						evalDescr = getEvalDesc();
-						evalDescrId = getEvalDescId();
-						evalDescrId = generateEvalDescId();
-						// *******************
+						do {
+							studentNumber = studentGradebookMarksResultSet.getString("STUDENT_ID");
+							grade = studentGradebookMarksResultSet.getDouble("POINTS_EARNED");
 
-						// # Get matching data for students from NWU_GRADEBOOK_DATA
-						nwuGradebookRecordsSelectPrepStmt = connection.prepareStatement(NWU_GRDB_RECORDS_SELECT);
-						nwuGradebookRecordsSelectPrepStmt.setString(1, siteId);
-						nwuGradebookRecordsSelectPrepStmt.setString(2, studentNumber);
-						nwuGradebookRecordsSelectPrepStmt.setInt(3, gradableObjectId);
-						nwuGradebookRecordsSelectPrepStmt.setString(4, module);
-						// nwuGradebookRecordsSelectPrepStmt.setInt(5, evalDescrId);
-						nwuGradebookRecordsSelectResultSet = nwuGradebookRecordsSelectPrepStmt.executeQuery();
+							recordedDate = studentGradebookMarksResultSet.getTimestamp("DATE_RECORDED").toLocalDateTime();
+							assessmentName = studentGradebookMarksResultSet.getString("NAME");
+							total = studentGradebookMarksResultSet.getDouble("POINTS_POSSIBLE");
+							dueDate = studentGradebookMarksResultSet.getTimestamp("DUE_DATE").toLocalDateTime();
+							gradableObjectId = studentGradebookMarksResultSet.getInt("ID");
+							// *******************
+							evalDescr = getEvalDesc();
+							evalDescrId = getEvalDescId();
+							evalDescrId = generateEvalDescId();
+							// *******************
 
-						if (nwuGradebookRecordsSelectResultSet.next()) {
-							do {
-								int id = nwuGradebookRecordsSelectResultSet.getInt("ID");
-								double existingGrade = nwuGradebookRecordsSelectResultSet.getDouble("GRADE");
-								LocalDateTime existingRecordedDate = nwuGradebookRecordsSelectResultSet
-										.getTimestamp("RECORDED_DATE").toLocalDateTime();
+							// # Get matching data for students from NWU_GRADEBOOK_DATA
+							nwuGradebookRecordsSelectPrepStmt = connection.prepareStatement(NWU_GRDB_RECORDS_SELECT);
+							nwuGradebookRecordsSelectPrepStmt.setString(1, siteId);
+							nwuGradebookRecordsSelectPrepStmt.setString(2, studentNumber);
+							nwuGradebookRecordsSelectPrepStmt.setInt(3, gradableObjectId);
+							nwuGradebookRecordsSelectPrepStmt.setString(4, module);
+							// nwuGradebookRecordsSelectPrepStmt.setInt(5, evalDescrId);
+							nwuGradebookRecordsSelectResultSet = nwuGradebookRecordsSelectPrepStmt.executeQuery();
 
-								// # If the grade and recordedDate differ, update NWU_GRADEBOOK_DATA record and add to map for WS
-								if (existingGrade != grade
-										|| (existingRecordedDate != null && !existingRecordedDate.isEqual(recordedDate))) {
+							if (nwuGradebookRecordsSelectResultSet.next()) {
+								do {
+									int id = nwuGradebookRecordsSelectResultSet.getInt("ID");
+									double existingGrade = nwuGradebookRecordsSelectResultSet.getDouble("GRADE");
+									LocalDateTime existingRecordedDate = nwuGradebookRecordsSelectResultSet
+											.getTimestamp("RECORDED_DATE").toLocalDateTime();
 
-									updateNWUGradebookData(studentNumber, studentGradeMap, grade, recordedDate, id);
-								}
-							} while (nwuGradebookRecordsSelectResultSet.next());
-						} else {
+									// # If the grade and recordedDate differ, update NWU_GRADEBOOK_DATA record and add to map for WS
+									if (existingGrade != grade
+											|| (existingRecordedDate != null && !existingRecordedDate.isEqual(recordedDate))) {
 
-							// # If the record does not exist in NWU_GRADEBOOK_DATA, insert new with status STATUS_NEW
-							insertNWUGradebookData(siteId, siteTitle, studentNumber, assessmentName, studentGradeMap, grade,
-									total, evalDescrId, dueDate, recordedDate, gradableObjectId, module);
-						}
+										updateNWUGradebookData(studentNumber, studentGradeMap, grade, recordedDate, id);
+									}
+								} while (nwuGradebookRecordsSelectResultSet.next());
+							} else {
+
+								// # If the record does not exist in NWU_GRADEBOOK_DATA, insert new with status STATUS_NEW
+								insertNWUGradebookData(siteId, siteTitle, studentNumber, assessmentName, studentGradeMap, grade,
+										total, evalDescrId, dueDate, recordedDate, gradableObjectId, module);
+							}
+						
+						} while (studentGradebookMarksResultSet.next());
 					}
 
 					if (!studentGradeMap.isEmpty()) {

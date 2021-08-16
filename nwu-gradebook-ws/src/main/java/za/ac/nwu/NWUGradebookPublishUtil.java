@@ -20,6 +20,7 @@ import java.util.Map.Entry;
 import java.util.StringTokenizer;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang.RandomStringUtils;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
@@ -70,6 +71,12 @@ public class NWUGradebookPublishUtil {
 
 	private final static String NWU_GRDB_INFO_SELECT = "SELECT * FROM NWU_GRADEBOOK_DATA WHERE SITE_ID = ? AND GRADABLE_OBJECT_ID = ?";
 
+	private final static String SITE_TITLE_SELECT = "SELECT TITLE FROM sakai_site where SITE_ID = ?";
+	
+	private final static String NWU_EVAL_DESCR_SELECT = "SELECT EVAL_DESCR FROM nwu_site_evaluation where SITE_ID = ? AND MODULE = ?";
+	private final static String NWU_EVAL_DESCRID_SELECT = "SELECT ID FROM nwu_site_evaluation where SITE_ID = ? AND MODULE = ? AND EVAL_DESCR = ?";
+	private final static String NWU_SITE_EVAL_INSERT = "INSERT INTO nwu_site_evaluation (SITE_ID, MODULE, EVAL_DESCR) VALUES (?,?,?)";
+
 	public NWUGradebookPublishUtil() {
 	}
 
@@ -93,8 +100,8 @@ public class NWUGradebookPublishUtil {
 		NWUGradebookRecord gradebookRecord = null;
 
 		try {
+			studentInfoMap = new HashMap<Long, List<NWUGradebookRecord>>();
 			for (Long assignmentId : assignmentIds) {
-				studentInfoMap = new HashMap<Long, List<NWUGradebookRecord>>();
 
 				// # Get matching data for students from NWU_GRADEBOOK_DATA
 				studentGBMarksInfoPrepStmt = connection.prepareStatement(NWU_GRDB_INFO_SELECT);
@@ -104,7 +111,7 @@ public class NWUGradebookPublishUtil {
 
 				studentInfoList = new ArrayList<NWUGradebookRecord>();
 
-				if (studentGBMarksInfoResultSet.next()) {
+				while (studentGBMarksInfoResultSet.next()) {
 					gradebookRecord = new NWUGradebookRecord();
 					gradebookRecord.setId(studentGBMarksInfoResultSet.getLong("ID"));
 					gradebookRecord.setSiteId(studentGBMarksInfoResultSet.getString("SITE_ID"));
@@ -125,10 +132,11 @@ public class NWUGradebookPublishUtil {
 					gradebookRecord.setDescription(studentGBMarksInfoResultSet.getString("DESCRIPTION"));
 					studentInfoList.add(gradebookRecord);
 				}
-				studentInfoMap.put(assignmentId, studentInfoList);
+				if(!studentInfoList.isEmpty()) {
+					studentInfoMap.put(assignmentId, studentInfoList);
+				}
 			}
 		} catch (Exception e) {
-
 			log.error("Could not get student info, see error log for siteId: " + siteId + "; assignmentIds: " + assignmentIds, e);
 		} finally {
 
@@ -183,12 +191,16 @@ public class NWUGradebookPublishUtil {
 			LocalDateTime dueDate = null;
 			LocalDateTime recordedDate = null;
 			List<String> moduleValues = null;
+			
+			siteTitle = getSiteTitle(siteId);
 
 			for (Map.Entry<String, List<String>> moduleEntry : sectionUsersMap.entrySet()) {
 
 				module = (String) moduleEntry.getKey();
 				studentNumbersForModule = moduleEntry.getValue();
 				studentGradeMap = new HashMap<>();
+				evalDescr = getEvalDesc(siteId, module);
+				evalDescrId = getEvalDescId(siteId, module, evalDescr);
 
 				for (String assignmentId : assignmentIds) {
 
@@ -216,7 +228,10 @@ public class NWUGradebookPublishUtil {
 						System.out.println("ResultSet in empty");
 
 				        System.out.println(sbSql.toString());
-				        System.out.println(studentNumbersForModule);
+				        System.out.println(studentNumbersForModule);				        
+
+						log.info("No Grades found and published to MPS, see error log for siteId: " + siteId + "; assignmentIds: "
+								+ assignmentIds);
 					} else {
 
 						do {
@@ -228,11 +243,6 @@ public class NWUGradebookPublishUtil {
 							total = studentGradebookMarksResultSet.getDouble("POINTS_POSSIBLE");
 							dueDate = studentGradebookMarksResultSet.getTimestamp("DUE_DATE").toLocalDateTime();
 							gradableObjectId = studentGradebookMarksResultSet.getInt("ID");
-							// *******************
-							evalDescr = getEvalDesc();
-							evalDescrId = getEvalDescId();
-							evalDescrId = generateEvalDescId();
-							// *******************
 
 							// # Get matching data for students from NWU_GRADEBOOK_DATA
 							nwuGradebookRecordsSelectPrepStmt = connection.prepareStatement(NWU_GRDB_RECORDS_SELECT);
@@ -771,19 +781,123 @@ public class NWUGradebookPublishUtil {
 		return studentInfoMap;
 	}
 
-	private static String getEvalDesc() {
-		// TODO Auto-generated method stub
-		return "TEST1";
+	/**
+	 * 
+	 * @param siteId
+	 * @return
+	 * @throws SQLException
+	 */
+	private static String getSiteTitle(String siteId) throws SQLException {
+
+		PreparedStatement siteTitlePrepStmt = connection.prepareStatement(SITE_TITLE_SELECT);
+		siteTitlePrepStmt.setString(1, siteId);
+		ResultSet siteTitleResultSet = siteTitlePrepStmt.executeQuery();
+		if (siteTitleResultSet.next()) {			
+			return siteTitleResultSet.getString("TITLE");
+		}			
+		return null;
 	}
 
-	private static int getEvalDescId() {
-
-		// RandomStringUtils.
-		return 1;
+	/**
+	 * 
+	 * @param siteId
+	 * @param module
+	 * @return
+	 */
+	private static String getEvalDesc(String siteId, String module) {		
+		String evalDesc = null;
+		PreparedStatement prepStmt = null;
+		try {
+			prepStmt = connection.prepareStatement(NWU_EVAL_DESCR_SELECT);
+			prepStmt.setString(1, siteId);
+			prepStmt.setString(2, module);
+			ResultSet resultSet = prepStmt.executeQuery();
+			if (resultSet.next()) {
+				evalDesc = resultSet.getString("EVAL_DESCR");
+			}
+		} catch (SQLException e) {
+			log.error("Exception evaluation code for: siteId: " + siteId + "; module: " + module, e);
+		} finally {
+			try {
+				if (prepStmt != null && !prepStmt.isClosed()) {
+					prepStmt.close();
+				}
+			} catch (SQLException e) {
+				log.error("Exception evaluation code for: siteId: " + siteId + "; module: " + module, e);
+			}
+		}
+		if(evalDesc == null) {
+			evalDesc = generateEvalDesc(siteId, module);
+		}
+		return evalDesc;
+	}
+	
+	/**
+	 * 
+	 * @param siteId
+	 * @param module
+	 * @param evalDescr
+	 * @return
+	 */
+	private static int getEvalDescId(String siteId, String module, String evalDescr) throws SQLException {
+		PreparedStatement prepStmt = null;
+		try {
+			prepStmt = connection.prepareStatement(NWU_EVAL_DESCRID_SELECT);
+			prepStmt.setString(1, siteId);
+			prepStmt.setString(2, module);
+			prepStmt.setString(3, evalDescr);
+			ResultSet resultSet = prepStmt.executeQuery();
+			if (resultSet.next()) {
+				return resultSet.getInt("ID");
+			}
+		} catch (SQLException e) {
+			log.error("Exception evaluation code for: siteId: " + siteId + "; module: " + module, e);
+		} finally {
+			try {
+				if (prepStmt != null && !prepStmt.isClosed()) {
+					prepStmt.close();
+				}
+			} catch (SQLException e) {
+				log.error("Exception evaluation code for: siteId: " + siteId + "; module: " + module, e);
+			}
+		}
+		return 0;
 	}
 
-	private static int generateEvalDescId() {
-		// RandomStringUtils.
-		return 1;
+	/**
+	 * 
+	 * @param siteId
+	 * @param module
+	 * @return
+	 */
+	private static String generateEvalDesc(String siteId, String module) {
+		String randomStr = RandomStringUtils.random(5);		
+		PreparedStatement prepStmt = null;
+		try {
+			prepStmt = connection.prepareStatement(NWU_SITE_EVAL_INSERT);
+
+			prepStmt.setString(1, siteId);
+			prepStmt.setString(2, module);
+			prepStmt.setString(3, randomStr);
+
+			// execute the preparedstatement
+			int count = prepStmt.executeUpdate();
+			if (count > 0) {
+				return getEvalDesc(siteId, module);
+			}
+		} catch (SQLException e) {
+			log.error("Could not insert random evaluation code for: siteId: " + siteId + "; module: " + module + "; randomStr: "
+					+ randomStr, e);
+		} finally {
+			try {
+				if (prepStmt != null && !prepStmt.isClosed()) {
+					prepStmt.close();
+				}
+			} catch (SQLException e) {
+				log.error("Could not insert random evaluation code for: siteId: " + siteId + "; module: " + module + "; randomStr: "
+						+ randomStr, e);
+			}
+		}
+		return "ERROR";
 	}
 }

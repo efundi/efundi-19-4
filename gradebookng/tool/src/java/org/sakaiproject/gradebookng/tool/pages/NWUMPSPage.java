@@ -146,7 +146,7 @@ public class NWUMPSPage extends BasePage {
 			Map<Long, List<NWUGradebookRecord>> studentInfoMap = gbUtil.getStudentInfoMap(businessService.getCurrentSiteId(), assignmentIds);
 			
 			AssignmentDataProvider assignmentDataProvider = new AssignmentDataProvider(assignments, studentInfoMap);
-			AjaxFallbackDefaultDataTable assignmentsTable = new AjaxFallbackDefaultDataTable<>("assignments-table", getColumns(), assignmentDataProvider, 25);
+			AjaxFallbackDefaultDataTable assignmentsTable = new AjaxFallbackDefaultDataTable<>("assignments-table", getColumns(), assignmentDataProvider, 100);
 			assignmentsTable.addBottomToolbar(new NoRecordsToolbar(assignmentsTable));
 					
 			add(new Button("send-marks"));

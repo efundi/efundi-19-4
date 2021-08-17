@@ -43,7 +43,7 @@ public class NWUMPSStudentInfoPanel extends BasePanel {
 
 	private void addPanelComponents(final GbAssignmentData assignmentData) {
 		StudentInfoDataProvider studentInfoDataProvider = new StudentInfoDataProvider(assignmentData);
-		AjaxFallbackDefaultDataTable studentInfoTable = new AjaxFallbackDefaultDataTable<>("student-info-table", getColumns(), studentInfoDataProvider, 100);
+		AjaxFallbackDefaultDataTable studentInfoTable = new AjaxFallbackDefaultDataTable<>("student-info-table", getColumns(), studentInfoDataProvider, 5000);
 		studentInfoTable.addBottomToolbar(new NoRecordsToolbar(studentInfoTable));
 		
 		String helpUrl = serverConfigService.getString(NWU_ITHELP_URL, "http://ithelp.nwu.ac.za");		

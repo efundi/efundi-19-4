@@ -52,7 +52,7 @@ public class NWUMPSPage extends BasePage {
 	
 	private Set<GbAssignmentData> selectedAssignments = new HashSet<GbAssignmentData>();
 	private Panel assignmentPanel = null;
-	private Panel current = assignmentPanel;
+	private Panel current = null;
 	private static NWUGradebookPublishUtil gbUtil = null;
 
 	/**
@@ -65,6 +65,7 @@ public class NWUMPSPage extends BasePage {
 		gbUtil = NWUGradebookPublishUtil.getInstance(serverConfigService.getString(SAK_PROP_DB_URL), serverConfigService.getString(SAK_PROP_DB_USERNAME), 
 				serverConfigService.getString(SAK_PROP_DB_PASSWORD));
 		assignmentPanel = new AssignmentPanel("main-panel");
+		current = assignmentPanel;
 	}
 
 	@Override
@@ -87,7 +88,6 @@ public class NWUMPSPage extends BasePage {
 		form.add(current);
 		add(form);
 	}
-
 	
 	class AjaxCheckBoxPanel extends Panel {
 		private static final long serialVersionUID = 1L;

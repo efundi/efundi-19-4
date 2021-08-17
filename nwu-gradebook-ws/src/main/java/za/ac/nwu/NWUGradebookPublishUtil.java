@@ -62,7 +62,7 @@ public final class NWUGradebookPublishUtil {
 	private static boolean initializeSuccess = false;
 	private static String dbUrl, dbUsername, dbPassword;
 
-	private final static String STUDENT_GRDB_MARKS_SELECT = "SELECT gr.STUDENT_ID, gr.POINTS_EARNED, gr.ID, gr.DATE_RECORDED, go.NAME, go.POINTS_POSSIBLE, go.DUE_DATE "
+	private final static String STUDENT_GRDB_MARKS_SELECT = "SELECT gr.STUDENT_ID, gr.POINTS_EARNED, gr.GRADABLE_OBJECT_ID, gr.DATE_RECORDED, go.NAME, go.POINTS_POSSIBLE, go.DUE_DATE "
 			+ " FROM gb_grade_record_t gr JOIN gb_gradable_object_t go ON go.ID = gr.GRADABLE_OBJECT_ID JOIN gb_grade_map_t gm ON gm.GRADEBOOK_ID = go.GRADEBOOK_ID JOIN gb_gradebook_t g ON "
 			+ " g.SELECTED_GRADE_MAPPING_ID = gm.ID WHERE go.ID = ? AND g.NAME = ? AND go.DUE_DATE IS NOT NULL AND gr.STUDENT_ID IN (";
 
@@ -260,7 +260,7 @@ public final class NWUGradebookPublishUtil {
 							assessmentName = studentGradebookMarksResultSet.getString("NAME");
 							total = studentGradebookMarksResultSet.getDouble("POINTS_POSSIBLE");
 							dueDate = studentGradebookMarksResultSet.getTimestamp("DUE_DATE").toLocalDateTime();
-							gradableObjectId = studentGradebookMarksResultSet.getInt("ID");
+							gradableObjectId = studentGradebookMarksResultSet.getInt("GRADABLE_OBJECT_ID");
 
 							// # Get matching data for students from NWU_GRADEBOOK_DATA
 							nwuGradebookRecordsSelectPrepStmt = connection.prepareStatement(NWU_GRDB_RECORDS_SELECT);
@@ -885,7 +885,7 @@ public final class NWUGradebookPublishUtil {
 	 * @return
 	 */
 	private static String generateEvalDesc(String siteId, String module) {
-		String randomStr = RandomStringUtils.random(5);		
+		String randomStr = RandomStringUtils.random(5, true, true);		
 		PreparedStatement prepStmt = null;
 		try {
 			prepStmt = connection.prepareStatement(NWU_SITE_EVAL_INSERT);

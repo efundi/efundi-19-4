@@ -46,9 +46,11 @@ import nwu.student.assesment.service.dto.StudentMarkInfo;
 /**
  * @author Joseph Gillman
  */
-public class NWUGradebookPublishUtil {
+public final class NWUGradebookPublishUtil {
 	private static final Logger log = LogManager.getLogger(NWUGradebookPublishUtil.class);
 
+    private static NWUGradebookPublishUtil INSTANCE;
+    
 	private static Connection connection = null;
 	private static PropertiesHolder properties = new PropertiesHolder();
 	private static StudentAssessmentServiceCRUD studentAssessmentServiceCRUDService = null;
@@ -84,11 +86,18 @@ public class NWUGradebookPublishUtil {
 	 * @param dbUsername
 	 * @param dbPassword
 	 */
-	public NWUGradebookPublishUtil(String dbUrl, String dbUsername, String dbPassword) {
+	private NWUGradebookPublishUtil(String dbUrl, String dbUsername, String dbPassword) {
 		this.dbUrl = dbUrl;
 		this.dbUsername = dbUsername;
 		this.dbPassword = dbPassword;
 	}
+	
+	public static NWUGradebookPublishUtil getInstance(String dbUrl, String dbUsername, String dbPassword) {
+        if(INSTANCE == null) {
+            INSTANCE = new NWUGradebookPublishUtil(dbUrl, dbUsername, dbPassword);
+        }
+        return INSTANCE;
+    }
 
 	/**
 	 * Get studentInfo for assignmentIds

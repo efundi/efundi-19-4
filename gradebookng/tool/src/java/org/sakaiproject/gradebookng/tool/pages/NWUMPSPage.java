@@ -53,7 +53,7 @@ public class NWUMPSPage extends BasePage {
 	private Set<GbAssignmentData> selectedAssignments = new HashSet<GbAssignmentData>();
 	private Panel assignmentPanel = null;
 	private Panel current = assignmentPanel;
-	private NWUGradebookPublishUtil gbUtil = null;
+	private static NWUGradebookPublishUtil gbUtil = null;
 
 	/**
 	 * 
@@ -62,7 +62,7 @@ public class NWUMPSPage extends BasePage {
 		defaultRoleChecksForInstructorOnlyPage();
 		disableLink(this.nwumpsPageLink);		
 		ServerConfigurationService serverConfigService = businessService.getServerConfigService();
-		gbUtil = new NWUGradebookPublishUtil(serverConfigService.getString(SAK_PROP_DB_URL), serverConfigService.getString(SAK_PROP_DB_USERNAME), 
+		gbUtil = NWUGradebookPublishUtil.getInstance(serverConfigService.getString(SAK_PROP_DB_URL), serverConfigService.getString(SAK_PROP_DB_USERNAME), 
 				serverConfigService.getString(SAK_PROP_DB_PASSWORD));
 		assignmentPanel = new AssignmentPanel("main-panel");
 	}

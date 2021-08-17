@@ -28,12 +28,14 @@ import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.Model;
 import org.apache.wicket.model.PropertyModel;
 import org.apache.wicket.request.resource.CssResourceReference;
+import org.sakaiproject.component.api.ServerConfigurationService;
 import org.sakaiproject.gradebookng.business.util.AssignmentDataProvider;
 import org.sakaiproject.gradebookng.tool.model.GbAssignmentData;
 import org.sakaiproject.gradebookng.tool.panels.NWUMPSStudentInfoPanel;
 import org.sakaiproject.service.gradebook.shared.Assignment;
 
 import za.ac.nwu.NWUGradebookPublishUtil;
+import za.ac.nwu.NWUGradebookRecord;
 
 /**
  * NWU MPS Page
@@ -43,14 +45,22 @@ import za.ac.nwu.NWUGradebookPublishUtil;
 public class NWUMPSPage extends BasePage {
 
 	private static final long serialVersionUID = 1L;
+
+    private static final String SAK_PROP_DB_URL = "url@javax.sql.BaseDataSource";
+    private static final String SAK_PROP_DB_USERNAME = "username@javax.sql.BaseDataSource";
+    private static final String SAK_PROP_DB_PASSWORD = "password@javax.sql.BaseDataSource";
 	
 	private Set<GbAssignmentData> selectedAssignments = new HashSet<GbAssignmentData>();
 	private Panel assignmentPanel = new AssignmentPanel("main-panel");
 	private Panel current = assignmentPanel;
+	private NWUGradebookPublishUtil gbUtil = null;
 
 	public NWUMPSPage() {
 		defaultRoleChecksForInstructorOnlyPage();
-		disableLink(this.nwumpsPageLink);
+		disableLink(this.nwumpsPageLink);		
+		ServerConfigurationService serverConfigService = businessService.getServerConfigService();
+		gbUtil = new NWUGradebookPublishUtil(serverConfigService.getString(SAK_PROP_DB_URL), serverConfigService.getString(SAK_PROP_DB_USERNAME), 
+				serverConfigService.getString(SAK_PROP_DB_PASSWORD));
 	}
 
 	@Override
@@ -66,10 +76,8 @@ public class NWUMPSPage extends BasePage {
 				System.out.println("Send Marks to MPS");
 				
 				List<String> selectedAssignmentIds = selectedAssignments.stream().map(GbAssignmentData::getAssignmentId).collect(Collectors.toList());
-				Map<String, List<String>> sectionUsersMap = businessService.getSectionUsersForCurrentSite();
-				
-				NWUGradebookPublishUtil gradebookPublishUtil = new NWUGradebookPublishUtil();		
-				gradebookPublishUtil.publishGradebookDataToMPS(businessService.getCurrentSiteId(), sectionUsersMap, selectedAssignmentIds);
+				Map<String, List<String>> sectionUsersMap = businessService.getSectionUsersForCurrentSite();	
+				gbUtil.publishGradebookDataToMPS(businessService.getCurrentSiteId(), sectionUsersMap, selectedAssignmentIds);
 			}
 		};
 		form.add(current);
@@ -130,8 +138,10 @@ public class NWUMPSPage extends BasePage {
 
 			// get the list of Assignments
 			final List<Assignment> assignments = businessService.getGradebookAssignments();
-
-			AssignmentDataProvider assignmentDataProvider = new AssignmentDataProvider(businessService.getCurrentSiteId(), assignments);
+			List<Long> assignmentIds = assignments.stream().map(Assignment::getId).collect(Collectors.toList());
+			Map<Long, List<NWUGradebookRecord>> studentInfoMap = gbUtil.getStudentInfoMap(businessService.getCurrentSiteId(), assignmentIds);
+			
+			AssignmentDataProvider assignmentDataProvider = new AssignmentDataProvider(assignments, studentInfoMap);
 			AjaxFallbackDefaultDataTable assignmentsTable = new AjaxFallbackDefaultDataTable<>("assignments-table", getColumns(), assignmentDataProvider, 25);
 			assignmentsTable.addBottomToolbar(new NoRecordsToolbar(assignmentsTable));
 					

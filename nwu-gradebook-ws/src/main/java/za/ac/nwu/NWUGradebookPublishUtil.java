@@ -58,6 +58,7 @@ public class NWUGradebookPublishUtil {
 	private static CourseOfferingService courseOfferingService = null;
 	private Map<Long, List<NWUGradebookRecord>> studentInfoMap = null;
 	private static boolean initializeSuccess = false;
+	private static String dbUrl, dbUsername, dbPassword;
 
 	private final static String STUDENT_GRDB_MARKS_SELECT = "SELECT gr.STUDENT_ID, gr.POINTS_EARNED, gr.ID, gr.DATE_RECORDED, go.NAME, go.POINTS_POSSIBLE, go.DUE_DATE "
 			+ " FROM gb_grade_record_t gr JOIN gb_gradable_object_t go ON go.ID = gr.GRADABLE_OBJECT_ID JOIN gb_grade_map_t gm ON gm.GRADEBOOK_ID = go.GRADEBOOK_ID JOIN gb_gradebook_t g ON "
@@ -77,20 +78,26 @@ public class NWUGradebookPublishUtil {
 	private final static String NWU_EVAL_DESCRID_SELECT = "SELECT ID FROM nwu_site_evaluation where SITE_ID = ? AND MODULE = ? AND EVAL_DESCR = ?";
 	private final static String NWU_SITE_EVAL_INSERT = "INSERT INTO nwu_site_evaluation (SITE_ID, MODULE, EVAL_DESCR) VALUES (?,?,?)";
 
-	public NWUGradebookPublishUtil() {
-	}
-
-	public NWUGradebookPublishUtil(String siteId, List<Long> assignmentIds) {
-		getStudentInfo(siteId, assignmentIds);
+	/**
+	 * 
+	 * @param dbUrl
+	 * @param dbUsername
+	 * @param dbPassword
+	 */
+	public NWUGradebookPublishUtil(String dbUrl, String dbUsername, String dbPassword) {
+		this.dbUrl = dbUrl;
+		this.dbUsername = dbUsername;
+		this.dbPassword = dbPassword;
 	}
 
 	/**
 	 * Get studentInfo for assignmentIds
 	 * 
-	 * @param siteId
+	 * @param string
 	 * @param assignmentIds
+	 * @return
 	 */
-	private void getStudentInfo(String siteId, List<Long> assignmentIds) {
+	public Map<Long, List<NWUGradebookRecord>> getStudentInfoMap(String siteId, List<Long> assignmentIds) {
 
 		openDatabaseConnection();
 
@@ -136,6 +143,7 @@ public class NWUGradebookPublishUtil {
 					studentInfoMap.put(assignmentId, studentInfoList);
 				}
 			}
+			
 		} catch (Exception e) {
 			log.error("Could not get student info, see error log for siteId: " + siteId + "; assignmentIds: " + assignmentIds, e);
 		} finally {
@@ -152,6 +160,7 @@ public class NWUGradebookPublishUtil {
 				log.error("Could not get student info, see error log for siteId: " + siteId + "; assignmentIds: " + assignmentIds, e);
 			}
 		}
+		return studentInfoMap;
 	}
 
 	/**
@@ -756,7 +765,7 @@ public class NWUGradebookPublishUtil {
 	 */
 	private static void openDatabaseConnection() {
 		try {
-			connection = DriverManager.getConnection(properties.getUrl(), properties.getUsername(), properties.getPassword());
+			connection = DriverManager.getConnection(dbUrl, dbUsername, dbPassword);
 			log.info("Database connection successfully made.");
 
 		} catch (Exception e) {
@@ -775,10 +784,6 @@ public class NWUGradebookPublishUtil {
 				log.error("Could not close Database connection. See error log: " + e);
 			}
 		}
-	}
-
-	public Map<Long, List<NWUGradebookRecord>> getStudentInfoMap() {
-		return studentInfoMap;
 	}
 
 	/**

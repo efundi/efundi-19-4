@@ -1,7 +1,6 @@
 package za.ac.nwu;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -61,9 +60,9 @@ public class RepublishNWUGradebookData {
         	properties = new PropertiesHolder();
 
             try {
-            	connection = DriverManager.getConnection(properties.getUrl(),
-            			properties.getUsername(),
-            			properties.getPassword());
+//            	connection = DriverManager.getConnection(properties.getUrl(),
+//            			properties.getUsername(),
+//            			properties.getPassword());
             	
                 log.info("Database connection successfully made.");
 

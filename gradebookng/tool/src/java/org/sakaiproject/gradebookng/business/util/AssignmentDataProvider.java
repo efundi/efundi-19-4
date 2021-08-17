@@ -8,7 +8,6 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import org.apache.commons.collections4.iterators.EmptyIterator;
 import org.apache.wicket.extensions.markup.html.repeater.util.SortableDataProvider;
@@ -18,7 +17,6 @@ import org.sakaiproject.gradebookng.tool.model.GbAssignmentData;
 import org.sakaiproject.gradebookng.tool.model.GbStudentInfoData;
 import org.sakaiproject.service.gradebook.shared.Assignment;
 
-import za.ac.nwu.NWUGradebookPublishUtil;
 import za.ac.nwu.NWUGradebookRecord;
 
 /**
@@ -30,17 +28,13 @@ public class AssignmentDataProvider extends SortableDataProvider<GbAssignmentDat
 	
 	private List<GbAssignmentData> assignmentList = null;
 
-	public AssignmentDataProvider(String siteId, List<Assignment> assignments) {
+	public AssignmentDataProvider(List<Assignment> assignments, Map<Long, List<NWUGradebookRecord>> studentInfoMap) {
 		// The default sorting
 //		setSort("name", SortOrder.ASCENDING);
 		
 		Date now = new Date();
         Instant nowInstant = now.toInstant();
         LocalDateTime nowLocalDateTime = LocalDateTime.ofInstant(nowInstant, ZoneId.systemDefault());
-        
-		List<Long> assignmentIds = assignments.stream().map(Assignment::getId).collect(Collectors.toList());		
-		NWUGradebookPublishUtil gradebookPublishUtil = new NWUGradebookPublishUtil(siteId, assignmentIds);
-		Map<Long, List<NWUGradebookRecord>> studentInfoMap = gradebookPublishUtil.getStudentInfoMap();
 				
 		GbAssignmentData gbAssignmentData = null;
 		assignmentList = new ArrayList<GbAssignmentData>();

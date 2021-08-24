@@ -42,7 +42,6 @@ import lombok.extern.slf4j.Slf4j;
 
 import org.sakaiproject.component.cover.ServerConfigurationService;
 import org.sakaiproject.rubrics.logic.RubricsConstants;
-import org.sakaiproject.rubrics.logic.RubricsService;
 import org.sakaiproject.time.api.UserTimeService;
 import org.sakaiproject.tool.assessment.facade.AssessmentFacade;
 import org.sakaiproject.tool.assessment.facade.AssessmentTemplateFacade;
@@ -136,7 +135,6 @@ public class AuthorBean implements Serializable
 
   private AssessmentService assessmentService = new AssessmentService();
   private PublishedAssessmentService publishedAssessmentService = new PublishedAssessmentService();
-  private RubricsService rubricsService = ComponentManager.get(RubricsService.class);
   private UserTimeService userTimeService = ComponentManager.get(UserTimeService.class);
 
   /* ------------------------------------ /*
@@ -966,16 +964,6 @@ public class AuthorBean implements Serializable
   }
 
 	public Boolean questionHasRubric(Long assessmentId, Long questionId, boolean isPublished) {
-		try {
-			if(!isPublished && rubricsService.hasAssociatedRubric(RubricsConstants.RBCS_TOOL_SAMIGO, assessmentId + "." + questionId)){
-				return Boolean.TRUE;
-			}
-			if(isPublished && rubricsService.hasAssociatedRubric(RubricsConstants.RBCS_TOOL_SAMIGO, RubricsConstants.RBCS_PUBLISHED_ASSESSMENT_ENTITY_PREFIX + assessmentId + "." + questionId)){
-				return Boolean.TRUE;
-			}
-		} catch(HttpClientErrorException hcee) {
-			log.debug("Current user doesn't have permission to get a rubric: {}", hcee.getMessage());
-		}
 		return Boolean.FALSE;
 	}
 }

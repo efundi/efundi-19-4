@@ -32,7 +32,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.sakaiproject.component.cover.ComponentManager;
 import org.sakaiproject.content.api.ContentResource;
 import org.sakaiproject.rubrics.logic.RubricsConstants;
-import org.sakaiproject.rubrics.logic.RubricsService;
 import org.sakaiproject.tags.api.Tag;
 import org.sakaiproject.tags.api.TagService;
 import org.sakaiproject.tool.assessment.data.dao.assessment.Answer;
@@ -62,14 +61,12 @@ import org.sakaiproject.tool.assessment.services.assessment.AssessmentService;
 public class ItemService
 {
   protected TagService tagService;
-  protected RubricsService rubricsService;
 
   /**
    * Creates a new ItemService object.
    */
   public ItemService()
   {
-    rubricsService = ComponentManager.get(RubricsService.class);
     tagService = ComponentManager.get(TagService.class);
   }
 
@@ -106,7 +103,6 @@ public class ItemService
     try {
       // delete rubric association
       String associationId = getAssessmentId(itemId) + "." + itemId;
-      rubricsService.deleteRubricAssociation(RubricsConstants.RBCS_TOOL_SAMIGO, associationId);
 	  
       // do not check for owner, anyone who has maintain role can modify items see SAK-2214
       PersistenceService.getInstance().getItemFacadeQueries().deleteItem(itemId, agentId);

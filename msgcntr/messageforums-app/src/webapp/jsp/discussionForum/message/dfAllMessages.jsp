@@ -23,7 +23,6 @@
 <script src="/messageforums-tool/js/forum_movethread.js"></script>
 
 <script src="/messageforums-tool/js/sak-10625.js"></script>
-<script type="module" src="/rubrics-service/webcomponents/rubric-association-requirements.js<h:outputText value="#{ForumTool.CDNQuery}" />"></script>
 
 <!--jsp/discussionForum/message/dfAllMessages.jsp-->
 		<link rel="stylesheet" type="text/css" href="../../css/TableSorter.css" />
@@ -191,14 +190,6 @@
 					<h:graphicImage url="/images/silk/date_delete.png" title="#{msgs.topic_restricted_message}" alt="#{msgs.topic_restricted_message}" rendered="#{ForumTool.selectedTopic.topic.availability == 'false'}" style="margin-right:.5em"/>
 					<h:graphicImage url="/images/silk/lock.png" alt="#{msgs.cdfm_forum_locked}" rendered="#{ForumTool.selectedForum.forum.locked == 'true' || ForumTool.selectedTopic.topic.locked == 'true'}" style="margin-right:.5em"/>
 					<%-- Rubrics marker --%>
-					<h:panelGroup rendered="#{ForumTool.selectedForum.hasRubric == 'true'}" >
-					  <sakai-rubric-student-preview-button
-						  token="<h:outputText value="#{ForumTool.rbcsToken}" />"
-						  display="icon"
-						  tool-id="sakai.forums"
-						  entity-id="<h:outputText value="top.#{ForumTool.selectedTopic.topic.id}" />">
-					  </sakai-rubric-student-preview-button>
-					</h:panelGroup>
 					<h:outputText value="#{ForumTool.selectedTopic.topic.title}" styleClass="title"/>
 
 			         <h:outputText id="topic_moderated" value=" #{msgs.cdfm_forum_moderated_flag}" styleClass="childrenNewZero" rendered="#{ForumTool.selectedTopic.moderated == 'true' }" />

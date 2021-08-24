@@ -31,7 +31,6 @@ import org.sakaiproject.gradebookng.business.exception.GbAccessDeniedException;
 import org.sakaiproject.gradebookng.business.util.MessageHelper;
 import org.sakaiproject.gradebookng.tool.pages.AccessDeniedPage;
 import org.sakaiproject.rubrics.logic.RubricsConstants;
-import org.sakaiproject.rubrics.logic.RubricsService;
 import org.sakaiproject.service.gradebook.shared.GradebookInformation;
 import org.sakaiproject.tool.gradebook.Gradebook;
 
@@ -45,9 +44,6 @@ public abstract class BasePanel extends Panel {
 
 	@SpringBean(name = "org.sakaiproject.gradebookng.business.GradebookNgBusinessService")
 	protected GradebookNgBusinessService businessService;
-
-	@SpringBean(name = "org.sakaiproject.rubrics.logic.RubricsService")
-	protected RubricsService rubricsService;
 
 	@SpringBean(name = "org.sakaiproject.component.api.ServerConfigurationService")
 	protected ServerConfigurationService serverConfigService;

@@ -140,7 +140,6 @@ import org.sakaiproject.exception.ServerOverloadException;
 import org.sakaiproject.exception.TypeException;
 import org.sakaiproject.rubrics.logic.model.ToolItemRubricAssociation;
 import org.sakaiproject.rubrics.logic.RubricsConstants;
-import org.sakaiproject.rubrics.logic.RubricsService;
 import org.sakaiproject.service.gradebook.shared.GradebookExternalAssessmentService;
 import org.sakaiproject.service.gradebook.shared.GradebookNotFoundException;
 import org.sakaiproject.service.gradebook.shared.GradebookService;
@@ -213,7 +212,6 @@ public class AssignmentServiceImpl implements AssignmentService, EntityTransferr
     @Setter private LinkMigrationHelper linkMigrationHelper;
     @Setter private TransactionTemplate transactionTemplate;
     @Setter private ResourceLoader resourceLoader;
-    @Setter private RubricsService rubricsService;
     @Setter private SecurityService securityService;
     @Setter private SessionManager sessionManager;
     @Setter private ServerConfigurationService serverConfigurationService;
@@ -938,16 +936,6 @@ public class AssignmentServiceImpl implements AssignmentService, EntityTransferr
 
                 assignmentRepository.newAssignment(assignment);
                 log.debug("Created duplicate assignment {} from {}", assignment.getId(), assignmentId);
-
-                //copy rubric
-                try {
-                    Optional<ToolItemRubricAssociation> rubricAssociation = rubricsService.getRubricAssociation(RubricsConstants.RBCS_TOOL_ASSIGNMENT, assignmentId);
-                    if (rubricAssociation.isPresent()) {
-                        rubricsService.saveRubricAssociation(RubricsConstants.RBCS_TOOL_ASSIGNMENT, assignment.getId(), rubricAssociation.get().getFormattedAssociation());
-                    }
-                } catch(Exception e){
-                    log.error("Error while trying to duplicate Rubrics: {} ", e.getMessage());
-                }
 
                 String reference = AssignmentReferenceReckoner.reckoner().assignment(assignment).reckon().getReference();
                 // event for tracking

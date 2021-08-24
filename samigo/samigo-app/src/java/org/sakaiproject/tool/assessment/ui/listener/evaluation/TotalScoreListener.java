@@ -47,7 +47,6 @@ import org.apache.commons.beanutils.BeanUtils;
 
 import org.sakaiproject.component.cover.ComponentManager;
 import org.sakaiproject.rubrics.logic.RubricsConstants;
-import org.sakaiproject.rubrics.logic.RubricsService;
 import org.sakaiproject.tool.assessment.business.entity.RecordingData;
 import org.sakaiproject.tool.assessment.data.dao.assessment.AssessmentAccessControl;
 import org.sakaiproject.tool.assessment.data.dao.assessment.PublishedAccessControl;
@@ -94,8 +93,6 @@ import org.sakaiproject.util.FormattedText;
   implements ActionListener, ValueChangeListener
 {
   private static BeanSort bs;
-
-  private RubricsService rubricsService = ComponentManager.get(RubricsService.class);
 
   //private SectionAwareness sectionAwareness;
   // private List availableSections;
@@ -202,8 +199,6 @@ import org.sakaiproject.util.FormattedText;
     	questionbean.setOtherMaxDisplayedScoreRows(0);
     	questionbean.setAudioMaxDisplayedScoreRows(5);
     }
-
-    submissionbean.setRbcsToken(rubricsService.generateJsonWebToken(RubricsConstants.RBCS_TOOL_SAMIGO));
 
     if (!totalScores(pubAssessment, bean, false))
     {

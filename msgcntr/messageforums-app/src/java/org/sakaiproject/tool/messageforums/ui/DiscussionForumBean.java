@@ -40,7 +40,6 @@ import org.sakaiproject.api.app.messageforums.ui.DiscussionForumManager;
 import org.sakaiproject.api.app.messageforums.ui.UIPermissionsManager;
 import org.sakaiproject.component.cover.ComponentManager;
 import org.sakaiproject.rubrics.logic.RubricsConstants;
-import org.sakaiproject.rubrics.logic.RubricsService;
 import org.sakaiproject.util.ResourceLoader;
 
 /**
@@ -72,8 +71,6 @@ public class DiscussionForumBean
   private static final String MESSAGECENTER_BUNDLE = "org.sakaiproject.api.app.messagecenter.bundle.Messages";
   private static final ResourceLoader rb = new ResourceLoader(MESSAGECENTER_BUNDLE);    
    
-  private static RubricsService rubricsService = ComponentManager.get(RubricsService.class);
-
   private SimpleDateFormat ourDateFormat() {
       SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
       df.setTimeZone(userPreferencesManager.getTimeZone());
@@ -772,6 +769,6 @@ public class DiscussionForumBean
 	}
 
 	public String getHasRubric(){
-		return rubricsService.hasAssociatedRubric(RubricsConstants.RBCS_TOOL_FORUMS, RubricsConstants.RBCS_FORUM_ENTITY_PREFIX + forum.getId()) ? Boolean.TRUE.toString() : Boolean.FALSE.toString();
+		return "false";
 	}
 }

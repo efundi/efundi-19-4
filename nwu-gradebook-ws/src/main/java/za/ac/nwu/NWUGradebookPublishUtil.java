@@ -201,7 +201,7 @@ public final class NWUGradebookPublishUtil {
 		ResultSet nwuGradebookRecordsSelectResultSet = null;
 
 		try {
-			String module = "", siteTitle = "", studentNumber, assessmentName = "", evalDescr = "";
+			String module = "", siteTitle = "", studentNumber, assessmentName = null, evalDescr = "", evalShortDescr = "";
 			List<String> studentNumbersForModule = null;
 			HashMap<Integer, Double> studentGradeMap = null;
 			double grade, total = 0.0;
@@ -217,11 +217,12 @@ public final class NWUGradebookPublishUtil {
 				module = (String) moduleEntry.getKey();
 				studentNumbersForModule = moduleEntry.getValue();
 				studentGradeMap = new HashMap<>();
-				evalDescr = getEvalDesc(siteId, module);
-				evalDescrId = getEvalDescId(siteId, module, evalDescr);
+				evalShortDescr = getEvalShortDesc(siteId, module);
+				evalDescrId = getEvalDescId(siteId, module, evalShortDescr);
 
 				for (String assignmentId : assignmentIds) {
 
+					assessmentName = null;
 					// # Get all student numbers and their grades for siteId and the date recorded between start and end date					
 					StringBuilder sbSql = new StringBuilder();
 					sbSql.append(STUDENT_GRDB_MARKS_SELECT);					
@@ -255,9 +256,13 @@ public final class NWUGradebookPublishUtil {
 						do {
 							studentNumber = studentGradebookMarksResultSet.getString("STUDENT_ID");
 							grade = studentGradebookMarksResultSet.getDouble("POINTS_EARNED");
-
 							recordedDate = studentGradebookMarksResultSet.getTimestamp("DATE_RECORDED").toLocalDateTime();
+							
+							if(assessmentName == null) {
+								evalDescr = getEvaluationDesc(assessmentName);
+							}
 							assessmentName = studentGradebookMarksResultSet.getString("NAME");
+							
 							total = studentGradebookMarksResultSet.getDouble("POINTS_POSSIBLE");
 							dueDate = studentGradebookMarksResultSet.getTimestamp("DUE_DATE").toLocalDateTime();
 							gradableObjectId = studentGradebookMarksResultSet.getInt("GRADABLE_OBJECT_ID");
@@ -339,27 +344,43 @@ public final class NWUGradebookPublishUtil {
 	}
 
 	/**
+	 * Generate Evaluation Descr from Assessment title, use first 38 chars and append "-E"
+	 * 
+	 * @param assessmentName
+	 * @return
+	 */
+	private String getEvaluationDesc(String assessmentName) {
+		String evaluationDesc = null;
+		if(assessmentName!= null && assessmentName.length() > 38) {
+			evaluationDesc = assessmentName.substring(0, 38);
+		} else {
+			evaluationDesc = assessmentName;
+		}
+		return evaluationDesc + "-E";
+	}
+
+	/**
 	 * @param siteId
 	 * @param module
 	 * @param moduleValues
 	 * @param studentGradeMap
 	 * @param siteTitle
-	 * @param assessmentName
 	 * @param evalDescr
+	 * @param evalShortDescr
 	 * @param total
 	 * @param dueDate
 	 * @param recordedDate
 	 */
 	private static void publishGrades(String siteId, String module, List<String> moduleValues,
-			HashMap<Integer, Double> studentGradeMap, String siteTitle, String assessmentName, String evalDescr, double total,
+			HashMap<Integer, Double> studentGradeMap, String siteTitle, String evalDescr, String evalShortDescr, double total,
 			LocalDateTime dueDate, LocalDateTime recordedDate) {
 
 		log.info("publishGrades start");
 		log.info("		siteId = " + siteId);
 		log.info("		module = " + module);
 		log.info("		studentGradeMap = " + studentGradeMap);
-		log.info("		assessmentName = " + assessmentName);
 		log.info("		evalDescr = " + evalDescr);
+		log.info("		evalShortDescr = " + evalShortDescr);
 		log.info("		total = " + total);
 		log.info("		dueDate = " + dueDate);
 		log.info("		recordedDate = " + recordedDate);
@@ -374,14 +395,14 @@ public final class NWUGradebookPublishUtil {
 				moduleValues.get(1), moduleSite, enrolmentCategoryTypeKey, modeOfDeliveryTypeKey, contextInfo);
 
 		if (moduleOfferingInfo == null) {
-			log.error("Grades could not be published, see error log for siteTitle: " + siteTitle + "; assessmentName: "
-					+ assessmentName);
+			log.error("Grades could not be published, see error log for siteTitle: " + siteTitle + "; evalDescr: "
+					+ evalDescr);
 			log.error("Could not find ModuleOfferingInfo, see error log for subjectCode: " + moduleValues.get(0)
 					+ "; moduleNumber: " + moduleValues.get(1) + "; moduleSite: " + moduleSite + "; enrolmentCategoryTypeKey: "
 					+ enrolmentCategoryTypeKey + "; modeOfDeliveryTypeKey: " + modeOfDeliveryTypeKey);
 			return;
 		}
-
+		
 		StudentMarkInfo studentMarkInfo = new StudentMarkInfo();
 		studentMarkInfo.setModuleSubjectCode(moduleValues.get(0));
 		studentMarkInfo.setModuleNumber(moduleValues.get(1));
@@ -391,10 +412,10 @@ public final class NWUGradebookPublishUtil {
 		studentMarkInfo.setTermTypeKey(moduleOfferingInfo.getTermTypeKey());
 		studentMarkInfo.setModuleOrgEnt(Integer.parseInt(moduleOfferingInfo.getModuleOrgEnt()));
 		studentMarkInfo.setModuleSite(Integer.parseInt(moduleSite));
-		studentMarkInfo.setClassGroupDescription(siteTitle);
+		studentMarkInfo.setClassGroupDescription("Complete");
 		studentMarkInfo.setLanguageTypeKey("vss.code.LANGUAGE.2");
-		studentMarkInfo.setEvaluationDesc(assessmentName);
-		studentMarkInfo.setEvaluationShortDesc(evalDescr);
+		studentMarkInfo.setEvaluationDesc(evalDescr);		
+		studentMarkInfo.setEvaluationShortDesc(evalShortDescr);
 		studentMarkInfo.setEvaluationCutOffDate(Date.from(dueDate.atZone(ZoneId.systemDefault()).toInstant()));
 		studentMarkInfo.setEvaluationMarkOutOff((int) total);
 		studentMarkInfo.setEvaluationNoOfSubmissions(1);
@@ -412,7 +433,7 @@ public final class NWUGradebookPublishUtil {
 			if (maintainStudentResponse == null) {
 				log.error(
 						"Response from publishGrades is empty for siteId: " + siteId + "; siteTitle: " + siteTitle + "; module: "
-								+ module + "; assessmentName: " + assessmentName + "; studentGradeMap: " + studentGradeMap);
+								+ module + "; evalDescr: " + evalDescr + "; studentGradeMap: " + studentGradeMap);
 
 				updateNWUGradebookRecordsWithStatus(siteId, module, studentGradeMap, NWUGradebookRecord.STATUS_FAIL,
 						"MaintainStudentResponse is null");
@@ -422,13 +443,13 @@ public final class NWUGradebookPublishUtil {
 
 		} catch (DoesNotExistException | InvalidParameterException | MissingParameterException | OperationFailedException
 				| PermissionDeniedException e) {
-			log.error("Grades could not be published, see error log for siteTitle: " + siteTitle + "; assessmentName: "
-					+ assessmentName, e);
+			log.error("Grades could not be published, see error log for siteTitle: " + siteTitle + "; evalDescr: "
+					+ evalDescr, e);
 
 			updateNWUGradebookRecordsWithStatus(siteId, module, studentGradeMap, NWUGradebookRecord.STATUS_FAIL, e.getMessage());
 		} catch (Exception e) {
-			log.error("Grades could not be published, see error log for siteTitle: " + siteTitle + "; assessmentName: "
-					+ assessmentName, e);
+			log.error("Grades could not be published, see error log for siteTitle: " + siteTitle + "; evalDescr: "
+					+ evalDescr, e);
 
 			updateNWUGradebookRecordsWithStatus(siteId, module, studentGradeMap, NWUGradebookRecord.STATUS_FAIL, e.getMessage());
 		}
@@ -818,7 +839,7 @@ public final class NWUGradebookPublishUtil {
 	 * @param module
 	 * @return
 	 */
-	private static String getEvalDesc(String siteId, String module) {		
+	private static String getEvalShortDesc(String siteId, String module) {		
 		String evalDesc = null;
 		PreparedStatement prepStmt = null;
 		try {
@@ -897,7 +918,7 @@ public final class NWUGradebookPublishUtil {
 			// execute the preparedstatement
 			int count = prepStmt.executeUpdate();
 			if (count > 0) {
-				return getEvalDesc(siteId, module);
+				return getEvalShortDesc(siteId, module);
 			}
 		} catch (SQLException e) {
 			log.error("Could not insert random evaluation code for: siteId: " + siteId + "; module: " + module + "; randomStr: "

@@ -57,6 +57,7 @@
 import { render } from '../lit-html/lib/shady-render.js';
 import { UpdatingElement } from './lib/updating-element.js';
 export * from './lib/updating-element.js';
+export { UpdatingElement as ReactiveElement } from './lib/updating-element.js';
 export * from './lib/decorators.js';
 export { html, svg, TemplateResult, SVGTemplateResult } from '../lit-html/lit-html.js';
 import { supportsAdoptingStyleSheets, unsafeCSS } from './lib/css-tag.js';
@@ -64,7 +65,7 @@ export * from './lib/css-tag.js';
 // IMPORTANT: do not change the property name or the assignment expression.
 // This line will be used in regexes to search for LitElement usage.
 // TODO(justinfagnani): inject version number at build time
-(window['litElementVersions'] || (window['litElementVersions'] = [])).push('2.4.0');
+(window['litElementVersions'] || (window['litElementVersions'] = [])).push('2.5.1');
 /**
  * Sentinal value used to avoid calling lit-html's render function when
  * subclasses do not implement `render`
@@ -162,7 +163,7 @@ export class LitElement extends UpdatingElement {
      * @returns {Element|DocumentFragment} Returns a node into which to render.
      */
     createRenderRoot() {
-        return this.attachShadow({ mode: 'open' });
+        return this.attachShadow(this.constructor.shadowRootOptions);
     }
     /**
      * Applies styling to the element shadowRoot using the [[`styles`]]
@@ -265,4 +266,6 @@ LitElement['finalized'] = true;
  * @nocollapse
  */
 LitElement.render = render;
+/** @nocollapse */
+LitElement.shadowRootOptions = { mode: 'open' };
 //# sourceMappingURL=lit-element.js.map

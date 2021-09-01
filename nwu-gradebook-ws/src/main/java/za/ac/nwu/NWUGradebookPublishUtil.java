@@ -201,7 +201,7 @@ public final class NWUGradebookPublishUtil {
 		ResultSet nwuGradebookRecordsSelectResultSet = null;
 
 		try {
-			String module = "", siteTitle = "", studentNumber, assessmentName = null, evalDescr = "", evalShortDescr = "";
+			String module = null, siteTitle = null, studentNumber, assessmentName = null, evalDescr = null, evalShortDescr = null;
 			List<String> studentNumbersForModule = null;
 			HashMap<Integer, Double> studentGradeMap = null;
 			double grade, total = 0.0;
@@ -223,6 +223,7 @@ public final class NWUGradebookPublishUtil {
 				for (String assignmentId : assignmentIds) {
 
 					assessmentName = null;
+					evalDescr = null;
 					// # Get all student numbers and their grades for siteId and the date recorded between start and end date					
 					StringBuilder sbSql = new StringBuilder();
 					sbSql.append(STUDENT_GRDB_MARKS_SELECT);					
@@ -257,11 +258,11 @@ public final class NWUGradebookPublishUtil {
 							studentNumber = studentGradebookMarksResultSet.getString("STUDENT_ID");
 							grade = studentGradebookMarksResultSet.getDouble("POINTS_EARNED");
 							recordedDate = studentGradebookMarksResultSet.getTimestamp("DATE_RECORDED").toLocalDateTime();
-							
-							if(assessmentName == null) {
-								evalDescr = getEvaluationDesc(assessmentName);
-							}
 							assessmentName = studentGradebookMarksResultSet.getString("NAME");
+							
+							if(evalDescr == null) {
+								evalDescr = getEvaluationDesc(assessmentName);
+							} 
 							
 							total = studentGradebookMarksResultSet.getDouble("POINTS_POSSIBLE");
 							dueDate = studentGradebookMarksResultSet.getTimestamp("DUE_DATE").toLocalDateTime();
@@ -307,7 +308,7 @@ public final class NWUGradebookPublishUtil {
 
 						// # If the INSERT was successful and studentGradeMap not empty, send student grades/data via Webservice
 						// StudentAssessmentServiceCRUD
-						publishGrades(siteId, module, moduleValues, studentGradeMap, siteTitle, assessmentName, evalDescr, total,
+						publishGrades(siteId, module, moduleValues, studentGradeMap, siteTitle, evalDescr, evalShortDescr, total,
 								dueDate, recordedDate);
 					}
 				}
@@ -840,7 +841,7 @@ public final class NWUGradebookPublishUtil {
 	 * @return
 	 */
 	private static String getEvalShortDesc(String siteId, String module) {		
-		String evalDesc = null;
+		String evalShortDesc = null;
 		PreparedStatement prepStmt = null;
 		try {
 			prepStmt = connection.prepareStatement(NWU_EVAL_DESCR_SELECT);
@@ -848,7 +849,7 @@ public final class NWUGradebookPublishUtil {
 			prepStmt.setString(2, module);
 			ResultSet resultSet = prepStmt.executeQuery();
 			if (resultSet.next()) {
-				evalDesc = resultSet.getString("EVAL_DESCR");
+				evalShortDesc = resultSet.getString("EVAL_DESCR");
 			}
 		} catch (SQLException e) {
 			log.error("Exception evaluation code for: siteId: " + siteId + "; module: " + module, e);
@@ -861,10 +862,11 @@ public final class NWUGradebookPublishUtil {
 				log.error("Exception evaluation code for: siteId: " + siteId + "; module: " + module, e);
 			}
 		}
-		if(evalDesc == null) {
-			evalDesc = generateEvalDesc(siteId, module);
+		//if it does not exist, generate one
+		if(evalShortDesc == null) {
+			evalShortDesc = generateEvalShortDesc(siteId, module);
 		}
-		return evalDesc;
+		return evalShortDesc;
 	}
 	
 	/**
@@ -905,7 +907,7 @@ public final class NWUGradebookPublishUtil {
 	 * @param module
 	 * @return
 	 */
-	private static String generateEvalDesc(String siteId, String module) {
+	private static String generateEvalShortDesc(String siteId, String module) {
 		String randomStr = RandomStringUtils.random(5, true, true);		
 		PreparedStatement prepStmt = null;
 		try {
@@ -918,7 +920,7 @@ public final class NWUGradebookPublishUtil {
 			// execute the preparedstatement
 			int count = prepStmt.executeUpdate();
 			if (count > 0) {
-				return getEvalShortDesc(siteId, module);
+				return randomStr;
 			}
 		} catch (SQLException e) {
 			log.error("Could not insert random evaluation code for: siteId: " + siteId + "; module: " + module + "; randomStr: "

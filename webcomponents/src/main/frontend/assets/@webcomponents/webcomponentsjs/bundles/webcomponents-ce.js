@@ -10,7 +10,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 */
 (function () {
   /*
-  Copyright (c) 2020 The Polymer Project Authors. All rights reserved.
+  Copyright (c) 2016 The Polymer Project Authors. All rights reserved.
   This code may only be used under the BSD style license found at
   http://polymer.github.io/LICENSE.txt The complete set of authors may be found
   at http://polymer.github.io/AUTHORS.txt The complete set of contributors may
@@ -18,16 +18,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   Google as part of the polymer project is also subject to an additional IP
   rights grant found at http://polymer.github.io/PATENTS.txt
   */
-  'use strict'; /*
-                Copyright (c) 2016 The Polymer Project Authors. All rights reserved.
-                This code may only be used under the BSD style license found at
-                http://polymer.github.io/LICENSE.txt The complete set of authors may be found
-                at http://polymer.github.io/AUTHORS.txt The complete set of contributors may
-                be found at http://polymer.github.io/CONTRIBUTORS.txt Code distributed by
-                Google as part of the polymer project is also subject to an additional IP
-                rights grant found at http://polymer.github.io/PATENTS.txt
-                */
-
+  'use strict';
   var n = window.Document.prototype.createElement,
       p = window.Document.prototype.createElementNS,
       aa = window.Document.prototype.importNode,
@@ -85,23 +76,23 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
   };function N() {
     var a = !(null === O || void 0 === O || !O.noDocumentConstructionObserver),
-        b = !(null === O || void 0 === O || !O.shadyDomFastWalk);this.h = [];this.a = [];this.f = !1;this.shadyDomFastWalk = b;this.C = !a;
+        b = !(null === O || void 0 === O || !O.shadyDomFastWalk);this.m = [];this.g = [];this.j = !1;this.shadyDomFastWalk = b;this.I = !a;
   }function P(a, b, c, f) {
-    var d = window.ShadyDom;if (a.shadyDomFastWalk && d && d.inUse) {
+    var d = window.ShadyDOM;if (a.shadyDomFastWalk && d && d.inUse) {
       if (b.nodeType === Node.ELEMENT_NODE && c(b), b.querySelectorAll) for (a = d.nativeMethods.querySelectorAll.call(b, "*"), b = 0; b < a.length; b++) c(a[b]);
     } else M(b, c, f);
   }function sa(a, b) {
-    a.f = !0;a.h.push(b);
+    a.j = !0;a.m.push(b);
   }function ta(a, b) {
-    a.f = !0;a.a.push(b);
+    a.j = !0;a.g.push(b);
   }
   function Q(a, b) {
-    a.f && P(a, b, function (c) {
+    a.j && P(a, b, function (c) {
       return R(a, c);
     });
   }function R(a, b) {
-    if (a.f && !b.__CE_patched) {
-      b.__CE_patched = !0;for (var c = 0; c < a.h.length; c++) a.h[c](b);for (c = 0; c < a.a.length; c++) a.a[c](b);
+    if (a.j && !b.__CE_patched) {
+      b.__CE_patched = !0;for (var c = 0; c < a.m.length; c++) a.m[c](b);for (c = 0; c < a.g.length; c++) a.g[c](b);
     }
   }function S(a, b) {
     var c = [];P(a, b, function (d) {
@@ -117,17 +108,17 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
   }
   function V(a, b, c) {
-    c = void 0 === c ? {} : c;var f = c.D,
+    c = void 0 === c ? {} : c;var f = c.J,
         d = c.upgrade || function (g) {
       return T(a, g);
     },
         e = [];P(a, b, function (g) {
-      a.f && R(a, g);if ("link" === g.localName && "import" === g.getAttribute("rel")) {
+      a.j && R(a, g);if ("link" === g.localName && "import" === g.getAttribute("rel")) {
         var h = g.import;h instanceof Node && (h.__CE_isImportDocument = !0, h.__CE_registry = document.__CE_registry);h && "complete" === h.readyState ? h.__CE_documentLoadHandled = !0 : g.addEventListener("load", function () {
           var k = g.import;if (!k.__CE_documentLoadHandled) {
             k.__CE_documentLoadHandled = !0;var l = new Set();f && (f.forEach(function (m) {
               return l.add(m);
-            }), l.delete(k));V(a, k, { D: l, upgrade: d });
+            }), l.delete(k));V(a, k, { J: l, upgrade: d });
           }
         });
       } else e.push(g);
@@ -197,79 +188,79 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         return a;
       } });window.dispatchEvent(e);e.defaultPrevented || console.error(a);
   };function va() {
-    var a = this;this.a = void 0;this.w = new Promise(function (b) {
-      a.g = b;
+    var a = this;this.g = void 0;this.F = new Promise(function (b) {
+      a.l = b;
     });
   }va.prototype.resolve = function (a) {
-    if (this.a) throw Error("Already resolved.");this.a = a;this.g(a);
+    if (this.g) throw Error("Already resolved.");this.g = a;this.l(a);
   };function wa(a) {
-    var b = document;this.g = void 0;this.b = a;this.a = b;V(this.b, this.a);"loading" === this.a.readyState && (this.g = new MutationObserver(this.A.bind(this)), this.g.observe(this.a, { childList: !0, subtree: !0 }));
+    var b = document;this.l = void 0;this.h = a;this.g = b;V(this.h, this.g);"loading" === this.g.readyState && (this.l = new MutationObserver(this.G.bind(this)), this.l.observe(this.g, { childList: !0, subtree: !0 }));
   }function xa(a) {
-    a.g && a.g.disconnect();
-  }wa.prototype.A = function (a) {
-    var b = this.a.readyState;"interactive" !== b && "complete" !== b || xa(this);for (b = 0; b < a.length; b++) for (var c = a[b].addedNodes, f = 0; f < c.length; f++) V(this.b, c[f]);
+    a.l && a.l.disconnect();
+  }wa.prototype.G = function (a) {
+    var b = this.g.readyState;"interactive" !== b && "complete" !== b || xa(this);for (b = 0; b < a.length; b++) for (var c = a[b].addedNodes, f = 0; f < c.length; f++) V(this.h, c[f]);
   };function Y(a) {
-    this.j = new Map();this.l = new Map();this.u = new Map();this.o = !1;this.s = new Map();this.i = function (b) {
+    this.s = new Map();this.u = new Map();this.C = new Map();this.A = !1;this.B = new Map();this.o = function (b) {
       return b();
-    };this.c = !1;this.m = [];this.b = a;this.v = a.C ? new wa(a) : void 0;
-  }Y.prototype.B = function (a, b) {
-    var c = this;if (!(b instanceof Function)) throw new TypeError("Custom element constructor getters must be functions.");ya(this, a);this.j.set(a, b);this.m.push(a);this.c || (this.c = !0, this.i(function () {
+    };this.i = !1;this.v = [];this.h = a;this.D = a.I ? new wa(a) : void 0;
+  }Y.prototype.H = function (a, b) {
+    var c = this;if (!(b instanceof Function)) throw new TypeError("Custom element constructor getters must be functions.");ya(this, a);this.s.set(a, b);this.v.push(a);this.i || (this.i = !0, this.o(function () {
       return za(c);
     }));
   };
   Y.prototype.define = function (a, b) {
-    var c = this;if (!(b instanceof Function)) throw new TypeError("Custom element constructors must be functions.");ya(this, a);Aa(this, a, b);this.m.push(a);this.c || (this.c = !0, this.i(function () {
+    var c = this;if (!(b instanceof Function)) throw new TypeError("Custom element constructors must be functions.");ya(this, a);Aa(this, a, b);this.v.push(a);this.i || (this.i = !0, this.o(function () {
       return za(c);
     }));
   };function ya(a, b) {
-    if (!qa(b)) throw new SyntaxError("The element name '" + b + "' is not valid.");if (W(a, b)) throw Error("A custom element with name '" + (b + "' has already been defined."));if (a.o) throw Error("A custom element is already being defined.");
+    if (!qa(b)) throw new SyntaxError("The element name '" + b + "' is not valid.");if (W(a, b)) throw Error("A custom element with name '" + (b + "' has already been defined."));if (a.A) throw Error("A custom element is already being defined.");
   }
   function Aa(a, b, c) {
-    a.o = !0;var f;try {
+    a.A = !0;var f;try {
       var d = c.prototype;if (!(d instanceof Object)) throw new TypeError("The custom element constructor's prototype is not an object.");var e = function (m) {
         var x = d[m];if (void 0 !== x && !(x instanceof Function)) throw Error("The '" + m + "' callback must be a function.");return x;
       };var g = e("connectedCallback");var h = e("disconnectedCallback");var k = e("adoptedCallback");var l = (f = e("attributeChangedCallback")) && c.observedAttributes || [];
     } catch (m) {
       throw m;
     } finally {
-      a.o = !1;
+      a.A = !1;
     }c = { localName: b,
-      constructorFunction: c, connectedCallback: g, disconnectedCallback: h, adoptedCallback: k, attributeChangedCallback: f, observedAttributes: l, constructionStack: [] };a.l.set(b, c);a.u.set(c.constructorFunction, c);return c;
+      constructorFunction: c, connectedCallback: g, disconnectedCallback: h, adoptedCallback: k, attributeChangedCallback: f, observedAttributes: l, constructionStack: [] };a.u.set(b, c);a.C.set(c.constructorFunction, c);return c;
   }Y.prototype.upgrade = function (a) {
-    V(this.b, a);
+    V(this.h, a);
   };
   function za(a) {
-    if (!1 !== a.c) {
-      a.c = !1;for (var b = [], c = a.m, f = new Map(), d = 0; d < c.length; d++) f.set(c[d], []);V(a.b, document, { upgrade: function (k) {
+    if (!1 !== a.i) {
+      a.i = !1;for (var b = [], c = a.v, f = new Map(), d = 0; d < c.length; d++) f.set(c[d], []);V(a.h, document, { upgrade: function (k) {
           if (void 0 === k.__CE_state) {
             var l = k.localName,
-                m = f.get(l);m ? m.push(k) : a.l.has(l) && b.push(k);
+                m = f.get(l);m ? m.push(k) : a.u.has(l) && b.push(k);
           }
-        } });for (d = 0; d < b.length; d++) T(a.b, b[d]);for (d = 0; d < c.length; d++) {
-        for (var e = c[d], g = f.get(e), h = 0; h < g.length; h++) T(a.b, g[h]);(e = a.s.get(e)) && e.resolve(void 0);
+        } });for (d = 0; d < b.length; d++) T(a.h, b[d]);for (d = 0; d < c.length; d++) {
+        for (var e = c[d], g = f.get(e), h = 0; h < g.length; h++) T(a.h, g[h]);(e = a.B.get(e)) && e.resolve(void 0);
       }c.length = 0;
     }
   }Y.prototype.get = function (a) {
     if (a = W(this, a)) return a.constructorFunction;
   };
   Y.prototype.whenDefined = function (a) {
-    if (!qa(a)) return Promise.reject(new SyntaxError("'" + a + "' is not a valid custom element name."));var b = this.s.get(a);if (b) return b.w;b = new va();this.s.set(a, b);var c = this.l.has(a) || this.j.has(a);a = -1 === this.m.indexOf(a);c && a && b.resolve(void 0);return b.w;
+    if (!qa(a)) return Promise.reject(new SyntaxError("'" + a + "' is not a valid custom element name."));var b = this.B.get(a);if (b) return b.F;b = new va();this.B.set(a, b);var c = this.u.has(a) || this.s.has(a);a = -1 === this.v.indexOf(a);c && a && b.resolve(void 0);return b.F;
   };Y.prototype.polyfillWrapFlushCallback = function (a) {
-    this.v && xa(this.v);var b = this.i;this.i = function (c) {
+    this.D && xa(this.D);var b = this.o;this.o = function (c) {
       return a(function () {
         return b(c);
       });
     };
   };
   function W(a, b) {
-    var c = a.l.get(b);if (c) return c;if (c = a.j.get(b)) {
-      a.j.delete(b);try {
+    var c = a.u.get(b);if (c) return c;if (c = a.s.get(b)) {
+      a.s.delete(b);try {
         return Aa(a, b, c());
       } catch (f) {
         X(f);
       }
     }
-  }window.CustomElementRegistry = Y;Y.prototype.define = Y.prototype.define;Y.prototype.upgrade = Y.prototype.upgrade;Y.prototype.get = Y.prototype.get;Y.prototype.whenDefined = Y.prototype.whenDefined;Y.prototype.polyfillDefineLazy = Y.prototype.B;Y.prototype.polyfillWrapFlushCallback = Y.prototype.polyfillWrapFlushCallback;function Z(a, b, c) {
+  }window.CustomElementRegistry = Y;Y.prototype.define = Y.prototype.define;Y.prototype.upgrade = Y.prototype.upgrade;Y.prototype.get = Y.prototype.get;Y.prototype.whenDefined = Y.prototype.whenDefined;Y.prototype.polyfillDefineLazy = Y.prototype.H;Y.prototype.polyfillWrapFlushCallback = Y.prototype.polyfillWrapFlushCallback;function Z(a, b, c) {
     function f(d) {
       return function (e) {
         for (var g = [], h = 0; h < arguments.length; ++h) g[h] = arguments[h];h = [];for (var k = [], l = 0; l < g.length; l++) {
@@ -322,8 +313,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         } else if ("afterbegin" === h) l = this.firstChild, e.call(this, h, k), g(this.firstChild, l);else if ("beforeend" === h) l = this.lastChild, e.call(this, h, k), g(l || this.firstChild, null);else if ("afterend" === h) l = this.nextSibling, e.call(this, h, k), g(this.nextSibling, l);else throw new SyntaxError("The value provided (" + String(h) + ") is not one of 'beforebegin', 'afterbegin', 'beforeend', or 'afterend'.");
       };
     }y && (Element.prototype.attachShadow = function (d) {
-      d = y.call(this, d);if (a.f && !d.__CE_patched) {
-        d.__CE_patched = !0;for (var e = 0; e < a.h.length; e++) a.h[e](d);
+      d = y.call(this, d);if (a.j && !d.__CE_patched) {
+        d.__CE_patched = !0;for (var e = 0; e < a.m.length; e++) a.m[e](d);
       }return this.__CE_shadowRoot = d;
     });z && z.get ? b(Element.prototype, z) : I && I.get ? b(HTMLElement.prototype, I) : ta(a, function (d) {
       b(d, { enumerable: !0, configurable: !0, get: function () {
@@ -345,7 +336,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     na ? c(HTMLElement.prototype, na) : G && c(Element.prototype, G);oa ? f(HTMLElement.prototype, oa) : H && f(Element.prototype, H);Z(a, Element.prototype, { prepend: fa, append: ha });Ca(a);
   };var Ea = {};function Fa(a) {
     function b() {
-      var c = this.constructor;var f = document.__CE_registry.u.get(c);if (!f) throw Error("Failed to construct a custom element: The constructor was not registered with `customElements`.");var d = f.constructionStack;if (0 === d.length) return d = n.call(document, f.localName), Object.setPrototypeOf(d, c.prototype), d.__CE_state = 1, d.__CE_definition = f, R(a, d), d;var e = d.length - 1,
+      var c = this.constructor;var f = document.__CE_registry.C.get(c);if (!f) throw Error("Failed to construct a custom element: The constructor was not registered with `customElements`.");var d = f.constructionStack;if (0 === d.length) return d = n.call(document, f.localName), Object.setPrototypeOf(d, c.prototype), d.__CE_state = 1, d.__CE_definition = f, R(a, d), d;var e = d.length - 1,
           g = d[e];if (g === Ea) throw Error("Failed to construct '" + f.localName + "': This element was already constructed.");d[e] = Ea;
       Object.setPrototypeOf(g, c.prototype);R(a, g);return g;
     }b.prototype = ma.prototype;Object.defineProperty(HTMLElement.prototype, "constructor", { writable: !0, configurable: !0, enumerable: !1, value: b });window.HTMLElement = b;

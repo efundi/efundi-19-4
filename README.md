@@ -1,4 +1,8 @@
-Move to Master
+
+
+Change in Gradebook to accomodate integration with MPS
+
+
 # eFundi changes 2020
 COURSEMANAGEMENT: 
 1 cm-scheduler base (add webservices)

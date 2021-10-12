@@ -61,6 +61,9 @@ public final class NWUGradebookPublishUtil {
 	private Map<Long, List<NWUGradebookRecord>> studentInfoMap = null;
 	private static boolean initializeSuccess = false;
 	private static String dbUrl, dbUsername, dbPassword;
+	
+	public final static String SUCCESS = "SUCCESS";
+	public final static String ERROR = "ERROR";
 
 	private final static String STUDENT_GRDB_MARKS_SELECT = "SELECT gr.STUDENT_ID, gr.POINTS_EARNED, gr.GRADABLE_OBJECT_ID, gr.DATE_RECORDED, go.NAME, go.POINTS_POSSIBLE, go.DUE_DATE "
 			+ " FROM gb_grade_record_t gr JOIN gb_gradable_object_t go ON go.ID = gr.GRADABLE_OBJECT_ID JOIN gb_grade_map_t gm ON gm.GRADEBOOK_ID = go.GRADEBOOK_ID JOIN gb_gradebook_t g ON "
@@ -178,14 +181,14 @@ public final class NWUGradebookPublishUtil {
 	 * @param assignmentIds
 	 * @throws SQLException
 	 */
-	public void publishGradebookDataToMPS(String siteId, Map<String, List<String>> sectionUsersMap,
+	public String publishGradebookDataToMPS(String siteId, Map<String, List<String>> sectionUsersMap,
 			List<String> assignmentIds) {
 		
 		if(!initializeSuccess) {
 			initializeSuccess = initializeWebserviceObjects();
 			if (!initializeSuccess) {
 				log.error("initializeWebserviceObjects was unsuccessful, please see error log");
-				return;
+				return ERROR;
 			}
 		}
 
@@ -319,6 +322,7 @@ public final class NWUGradebookPublishUtil {
 		} catch (Exception e) {
 			log.error("Grades could not be published to MPS, see error log for siteId: " + siteId + "; assignmentIds: "
 					+ assignmentIds, e);
+			return ERROR;
 		} finally {
 
 			try {
@@ -340,8 +344,10 @@ public final class NWUGradebookPublishUtil {
 			} catch (SQLException e) {
 				log.error("Grades could not be published to MPS, see error log for siteId: " + siteId + "; assignmentIds: "
 						+ assignmentIds, e);
-			}
+				return ERROR;
+			}			
 		}
+		return SUCCESS;
 	}
 
 	/**

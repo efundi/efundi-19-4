@@ -25,6 +25,7 @@ public class StudentInfoDataProvider extends SortableDataProvider<GbStudentInfoD
 		
 		if(assignmentData != null) {
 			for (GbStudentInfoData studentInfoData : assignmentData.getStudentInfoDataList()) {
+				studentInfoData.setAssignmentData(assignmentData);
 				studentInfoList.add(studentInfoData);
 			}
 		}

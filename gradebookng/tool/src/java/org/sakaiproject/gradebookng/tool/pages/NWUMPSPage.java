@@ -21,6 +21,7 @@ import org.apache.wicket.extensions.markup.html.repeater.data.table.NoRecordsToo
 import org.apache.wicket.extensions.markup.html.repeater.data.table.PropertyColumn;
 import org.apache.wicket.markup.head.CssHeaderItem;
 import org.apache.wicket.markup.head.IHeaderResponse;
+import org.apache.wicket.markup.head.JavaScriptHeaderItem;
 import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.markup.html.form.CheckBox;
 import org.apache.wicket.markup.html.form.Form;
@@ -36,6 +37,7 @@ import org.sakaiproject.gradebookng.tool.component.GbAjaxButton;
 import org.sakaiproject.gradebookng.tool.model.GbAssignmentData;
 import org.sakaiproject.gradebookng.tool.model.GbModalWindow;
 import org.sakaiproject.gradebookng.tool.panels.NWUMPSStudentInfoPanel;
+import org.sakaiproject.portal.util.PortalUtils;
 import org.sakaiproject.service.gradebook.shared.Assignment;
 
 import za.ac.nwu.NWUGradebookPublishUtil;
@@ -62,9 +64,10 @@ public class NWUMPSPage extends BasePage {
 	GbModalWindow modalOutput;
 
 	public NWUMPSPage() {
+		
 		defaultRoleChecksForInstructorOnlyPage();
 		disableLink(this.nwumpsPageLink);
-
+		
 		ServerConfigurationService serverConfigService = businessService.getServerConfigService();
 		gbUtil = NWUGradebookPublishUtil.getInstance(serverConfigService.getString(SAK_PROP_DB_URL),
 				serverConfigService.getString(SAK_PROP_DB_USERNAME), serverConfigService.getString(SAK_PROP_DB_PASSWORD));
@@ -242,6 +245,7 @@ public class NWUMPSPage extends BasePage {
 
 			List<String> selectedAssignmentIds = selectedAssignments.stream().map(GbAssignmentData::getAssignmentId)
 					.collect(Collectors.toList());
+			if(selectedAssignmentIds == null || selectedAssignmentIds.isEmpty()) return;
 			Map<String, List<String>> sectionUsersMap = businessService.getSectionUsersForCurrentSite();
 			gbUtil.publishGradebookDataToMPS(businessService.getCurrentSiteId(), sectionUsersMap,
 					selectedAssignmentIds);
@@ -269,7 +273,7 @@ public class NWUMPSPage extends BasePage {
 				@Override
 				public void onClick(AjaxRequestTarget target) {
 					// System.out.println((GbAssignmentData) getParent().getDefaultModelObject());
-					NWUMPSStudentInfoPanel studentInfoPanel = new NWUMPSStudentInfoPanel("main-panel",
+					NWUMPSStudentInfoPanel studentInfoPanel = new NWUMPSStudentInfoPanel("main-panel", gbUtil,
 							(GbAssignmentData) getParent().getDefaultModelObject());
 					studentInfoPanel.setOutputMarkupId(true);
 					current.replaceWith(studentInfoPanel);
@@ -281,13 +285,17 @@ public class NWUMPSPage extends BasePage {
 		}
 	}
 
+	public GbModalWindow getModalOutputWindow() {
+		return this.modalOutput;
+	}
+
 	@Override
 	public void renderHead(IHeaderResponse response) {
 		super.renderHead(response);
 		response.render(CssHeaderItem.forReference(new CssResourceReference(NWUMPSPage.class, "repeater.css")));
-	}
+		
+		final String version = PortalUtils.getCDNQuery();
+		response.render(JavaScriptHeaderItem.forUrl(String.format("/gradebookng-tool/scripts/gradebook-nwu-mps.js%s", version)));
 
-	public GbModalWindow getModalOutputWindow() {
-		return this.modalOutput;
 	}
 }

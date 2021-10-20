@@ -61,6 +61,9 @@ public final class NWUGradebookPublishUtil {
 	private Map<Long, List<NWUGradebookRecord>> studentInfoMap = null;
 	private static boolean initializeSuccess = false;
 	private static String dbUrl, dbUsername, dbPassword;
+	
+	public final static String SUCCESS = "SUCCESS";
+	public final static String ERROR = "ERROR";
 
 	private final static String STUDENT_GRDB_MARKS_SELECT = "SELECT gr.STUDENT_ID, gr.POINTS_EARNED, gr.GRADABLE_OBJECT_ID, gr.DATE_RECORDED, go.NAME, go.POINTS_POSSIBLE, go.DUE_DATE "
 			+ " FROM gb_grade_record_t gr JOIN gb_gradable_object_t go ON go.ID = gr.GRADABLE_OBJECT_ID JOIN gb_grade_map_t gm ON gm.GRADEBOOK_ID = go.GRADEBOOK_ID JOIN gb_gradebook_t g ON "
@@ -70,8 +73,8 @@ public final class NWUGradebookPublishUtil {
 	private final static String NWU_GRDB_RECORDS_INSERT = "INSERT INTO NWU_GRADEBOOK_DATA (SITE_ID, SITE_TITLE, MODULE, ASSESSMENT_NAME, STUDENT_NUMBER, EVAL_DESCR_ID, GRADE, "
 			+ "TOTAL_MARK, GRADABLE_OBJECT_ID, RECORDED_DATE, DUE_DATE, CREATED_DATE, STATUS, RETRY_COUNT) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
 	private final static String NWU_GRDB_RECORDS_GRADE_UPDATE = "UPDATE NWU_GRADEBOOK_DATA SET GRADE = ?, RECORDED_DATE = ?, MODIFIED_DATE = ?, STATUS = ? WHERE ID = ?";
-	private final static String NWU_GRDB_RECORDS_STATUS_UPDATE = "UPDATE NWU_GRADEBOOK_DATA SET STATUS = ?, MODIFIED_DATE = ?, DESCRIPTION = ? WHERE SITE_ID = ? AND STUDENT_NUMBER = ? AND MODULE = ?";
-
+	private final static String NWU_GRDB_RECORDS_STATUS_UPDATE = "UPDATE NWU_GRADEBOOK_DATA SET STATUS = ?, MODIFIED_DATE = ?, DESCRIPTION = ? WHERE SITE_ID = ? AND STUDENT_NUMBER = ? AND MODULE = ? AND RETRY_COUNT = RETRY_COUNT + 1";
+	
 	private final static String NWU_GRDB_INFO_SELECT = "SELECT * FROM NWU_GRADEBOOK_DATA WHERE SITE_ID = ? AND GRADABLE_OBJECT_ID = ?";
 
 	private final static String SITE_TITLE_SELECT = "SELECT TITLE FROM sakai_site where SITE_ID = ?";
@@ -178,14 +181,14 @@ public final class NWUGradebookPublishUtil {
 	 * @param assignmentIds
 	 * @throws SQLException
 	 */
-	public void publishGradebookDataToMPS(String siteId, Map<String, List<String>> sectionUsersMap,
+	public String publishGradebookDataToMPS(String siteId, Map<String, List<String>> sectionUsersMap,
 			List<String> assignmentIds) {
 		
 		if(!initializeSuccess) {
 			initializeSuccess = initializeWebserviceObjects();
 			if (!initializeSuccess) {
 				log.error("initializeWebserviceObjects was unsuccessful, please see error log");
-				return;
+				return ERROR;
 			}
 		}
 
@@ -319,6 +322,7 @@ public final class NWUGradebookPublishUtil {
 		} catch (Exception e) {
 			log.error("Grades could not be published to MPS, see error log for siteId: " + siteId + "; assignmentIds: "
 					+ assignmentIds, e);
+			return ERROR;
 		} finally {
 
 			try {
@@ -340,6 +344,209 @@ public final class NWUGradebookPublishUtil {
 			} catch (SQLException e) {
 				log.error("Grades could not be published to MPS, see error log for siteId: " + siteId + "; assignmentIds: "
 						+ assignmentIds, e);
+				return ERROR;
+			}			
+		}
+		return SUCCESS;
+	}
+	
+	/**
+	 * @param siteId
+	 * @param sectionUsersMap
+	 * @param assignmentId 
+	 * @param selectedStudentInfoIds
+	 * @throws SQLException
+	 */
+	public String republishGradebookDataToMPS(String siteId, Map<String, List<String>> sectionUsersMap,
+			String assignmentId, List<String> selectedStudentInfoIds) {
+
+		if (!initializeSuccess) {
+			initializeSuccess = initializeWebserviceObjects();
+			if (!initializeSuccess) {
+				log.error("initializeWebserviceObjects was unsuccessful, please see error log");
+				return ERROR;
+			}
+		}
+
+		openDatabaseConnection();
+
+		DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
+		log.info("Start Republishing NWU Gradebook Data at " + dtf.format(LocalDateTime.now()));
+
+		PreparedStatement studentGradebookMarksPrepStmt = null;
+		PreparedStatement nwuGradebookRecordsSelectPrepStmt = null;
+
+		ResultSet studentGradebookMarksResultSet = null;
+		ResultSet nwuGradebookRecordsSelectResultSet = null;
+
+		try {
+			String module = null, siteTitle = null, studentNumber, assessmentName = null, evalDescr = null, evalShortDescr = null;
+			List<String> studentNumbersForModule = null;
+			List<String> selectedStudentNumbersForModule = null;
+			HashMap<Integer, Double> studentGradeMap = null;
+			double grade, total = 0.0;
+			int evalDescrId, gradableObjectId;
+			LocalDateTime dueDate = null;
+			LocalDateTime recordedDate = null;
+			List<String> moduleValues = null;
+
+			siteTitle = getSiteTitle(siteId);
+
+			for (Map.Entry<String, List<String>> moduleEntry : sectionUsersMap.entrySet()) {
+
+				module = (String) moduleEntry.getKey();
+				studentNumbersForModule = moduleEntry.getValue();
+				selectedStudentNumbersForModule = new ArrayList<String>();
+
+				getStudentNumbersForModule(selectedStudentNumbersForModule, selectedStudentInfoIds, studentNumbersForModule);
+				if (selectedStudentNumbersForModule == null)
+					continue;
+
+				studentGradeMap = new HashMap<>();
+				evalShortDescr = getEvalShortDesc(siteId, module);
+				evalDescrId = getEvalDescId(siteId, module, evalShortDescr);
+
+				assessmentName = null;
+				evalDescr = null;
+				// # Get all student numbers and their grades for siteId and the date recorded between start and end date
+				StringBuilder sbSql = new StringBuilder();
+				sbSql.append(STUDENT_GRDB_MARKS_SELECT);
+
+				for (int i = 0; i < selectedStudentNumbersForModule.size(); i++) {
+					if (i > 0)
+						sbSql.append(",");
+					sbSql.append(" ?");
+				}
+				sbSql.append(" ) ");
+				studentGradebookMarksPrepStmt = connection.prepareStatement(sbSql.toString());
+
+				int counter = 1;
+				studentGradebookMarksPrepStmt.setInt(counter++, Integer.parseInt(assignmentId));
+				studentGradebookMarksPrepStmt.setString(counter++, siteId);
+
+				for (int i = 0; i < selectedStudentNumbersForModule.size(); i++) {
+					studentGradebookMarksPrepStmt.setString(counter++, selectedStudentNumbersForModule.get(i));
+				}
+				studentGradebookMarksResultSet = studentGradebookMarksPrepStmt.executeQuery();
+
+				if (studentGradebookMarksResultSet.next() == false) {
+					System.out.println("ResultSet in empty");
+
+					System.out.println(sbSql.toString());
+					System.out.println(selectedStudentNumbersForModule);
+
+					log.info("No Grades found and republished to MPS, see error log for siteId: " + siteId + "; assignmentId: "
+							+ assignmentId);
+				} else {
+
+					do {
+						studentNumber = studentGradebookMarksResultSet.getString("STUDENT_ID");
+						grade = studentGradebookMarksResultSet.getDouble("POINTS_EARNED");
+						recordedDate = studentGradebookMarksResultSet.getTimestamp("DATE_RECORDED").toLocalDateTime();
+						assessmentName = studentGradebookMarksResultSet.getString("NAME");
+
+						if (evalDescr == null) {
+							evalDescr = getEvaluationDesc(assessmentName);
+						}
+
+						total = studentGradebookMarksResultSet.getDouble("POINTS_POSSIBLE");
+						dueDate = studentGradebookMarksResultSet.getTimestamp("DUE_DATE").toLocalDateTime();
+						gradableObjectId = studentGradebookMarksResultSet.getInt("GRADABLE_OBJECT_ID");
+
+						// # Get matching data for students from NWU_GRADEBOOK_DATA
+						nwuGradebookRecordsSelectPrepStmt = connection.prepareStatement(NWU_GRDB_RECORDS_SELECT);
+						nwuGradebookRecordsSelectPrepStmt.setString(1, siteId);
+						nwuGradebookRecordsSelectPrepStmt.setString(2, studentNumber);
+						nwuGradebookRecordsSelectPrepStmt.setInt(3, gradableObjectId);
+						nwuGradebookRecordsSelectPrepStmt.setString(4, module);
+						// nwuGradebookRecordsSelectPrepStmt.setInt(5, evalDescrId);
+						nwuGradebookRecordsSelectResultSet = nwuGradebookRecordsSelectPrepStmt.executeQuery();
+
+						if (nwuGradebookRecordsSelectResultSet.next()) {
+							do {
+								int id = nwuGradebookRecordsSelectResultSet.getInt("ID");
+								double existingGrade = nwuGradebookRecordsSelectResultSet.getDouble("GRADE");
+								LocalDateTime existingRecordedDate = nwuGradebookRecordsSelectResultSet
+										.getTimestamp("RECORDED_DATE").toLocalDateTime();
+
+								// # If the grade and recordedDate differ, update NWU_GRADEBOOK_DATA record and add to map for WS
+								if (existingGrade != grade
+										|| (existingRecordedDate != null && !existingRecordedDate.isEqual(recordedDate))) {
+
+									updateNWUGradebookData(studentNumber, studentGradeMap, grade, recordedDate, id);
+								}
+							} while (nwuGradebookRecordsSelectResultSet.next());
+						} else {
+
+							// # If the record does not exist in NWU_GRADEBOOK_DATA, insert new with status STATUS_NEW
+							insertNWUGradebookData(siteId, siteTitle, studentNumber, assessmentName, studentGradeMap, grade,
+									total, evalDescrId, dueDate, recordedDate, gradableObjectId, module);
+						}
+
+					} while (studentGradebookMarksResultSet.next());
+				}
+
+				if (!studentGradeMap.isEmpty()) {
+
+					moduleValues = Collections.list(new StringTokenizer(module, " ")).stream().map(token -> (String) token)
+							.collect(Collectors.toList());
+
+					// # If the INSERT was successful and studentGradeMap not empty, send student grades/data via Webservice
+					// StudentAssessmentServiceCRUD
+					republishGrades(siteId, module, moduleValues, studentGradeMap, siteTitle, evalDescr, evalShortDescr, total,
+							dueDate, recordedDate);
+				}
+
+				log.info("Republishing NWU Gradebook Data complete! Finished at " + dtf.format(LocalDateTime.now()));
+			}
+
+		} catch (Exception e) {
+			log.error("Grades could not be republished to MPS, see error log for siteId: " + siteId + "; assignmentId: "
+					+ assignmentId, e);
+			return ERROR;
+		} finally {
+
+			try {
+				if (studentGradebookMarksResultSet != null && !studentGradebookMarksResultSet.isClosed()) {
+					studentGradebookMarksResultSet.close();
+				}
+				if (nwuGradebookRecordsSelectResultSet != null && !nwuGradebookRecordsSelectResultSet.isClosed()) {
+					nwuGradebookRecordsSelectResultSet.close();
+				}
+
+				if (studentGradebookMarksPrepStmt != null && !studentGradebookMarksPrepStmt.isClosed()) {
+					studentGradebookMarksPrepStmt.close();
+				}
+				if (nwuGradebookRecordsSelectPrepStmt != null && !nwuGradebookRecordsSelectPrepStmt.isClosed()) {
+					nwuGradebookRecordsSelectPrepStmt.close();
+				}
+
+				closeDatabaseConnection();
+			} catch (SQLException e) {
+				log.error("Grades could not be republished to MPS, see error log for siteId: " + siteId + "; assignmentId: "
+						+ assignmentId, e);
+				return ERROR;
+			}
+		}
+		return SUCCESS;
+	}
+
+	/**
+	 * 
+	 * @param selectedStudentNumbersForModule
+	 * @param selectedStudentInfoIds
+	 * @param studentNumbersForModule
+	 * @return
+	 */
+	private void getStudentNumbersForModule(List<String> selectedStudentNumbersForModule, List<String> selectedStudentInfoIds, List<String> studentNumbersForModule) {
+		
+		if(selectedStudentInfoIds == null || selectedStudentInfoIds.isEmpty() || studentNumbersForModule == null || studentNumbersForModule.isEmpty()) {
+			return;
+		}
+		
+		for (String studentInfoId : selectedStudentInfoIds) {
+			if(studentNumbersForModule.contains(studentInfoId)) {
+				selectedStudentNumbersForModule.add(studentInfoId);
 			}
 		}
 	}
@@ -456,6 +663,103 @@ public final class NWUGradebookPublishUtil {
 		}
 
 		log.info("publishGrades end");
+	}
+	
+	/**
+	 * @param siteId
+	 * @param module
+	 * @param moduleValues
+	 * @param studentGradeMap
+	 * @param siteTitle
+	 * @param evalDescr
+	 * @param evalShortDescr
+	 * @param total
+	 * @param dueDate
+	 * @param recordedDate
+	 */
+	private void republishGrades(String siteId, String module, List<String> moduleValues,
+			HashMap<Integer, Double> studentGradeMap, String siteTitle, String evalDescr, String evalShortDescr, double total,
+			LocalDateTime dueDate, LocalDateTime recordedDate) {
+		log.info("republishGrades start");
+		log.info("		siteId = " + siteId);
+		log.info("		module = " + module);
+		log.info("		studentGradeMap = " + studentGradeMap);
+		log.info("		evalDescr = " + evalDescr);
+		log.info("		evalShortDescr = " + evalShortDescr);
+		log.info("		total = " + total);
+		log.info("		dueDate = " + dueDate);
+		log.info("		recordedDate = " + recordedDate);
+
+		String strValue = moduleValues.get(2);
+		int indexOf = strValue.indexOf("-");
+		String enrolmentCategoryTypeKey = "vss.code.ENROLCAT." + strValue.substring(0, indexOf);
+		String modeOfDeliveryTypeKey = "vss.code.PRESENTCAT." + strValue.substring(indexOf + 1);
+
+		String moduleSite = Campus.getNumber(moduleValues.get(3));
+		ModuleOfferingInfo moduleOfferingInfo = getModuleOfferingInfo(academicPeriodInfo, moduleValues.get(0),
+				moduleValues.get(1), moduleSite, enrolmentCategoryTypeKey, modeOfDeliveryTypeKey, contextInfo);
+
+		if (moduleOfferingInfo == null) {
+			log.error("Grades could not be republished, see error log for siteTitle: " + siteTitle + "; evalDescr: "
+					+ evalDescr);
+			log.error("Could not find ModuleOfferingInfo, see error log for subjectCode: " + moduleValues.get(0)
+					+ "; moduleNumber: " + moduleValues.get(1) + "; moduleSite: " + moduleSite + "; enrolmentCategoryTypeKey: "
+					+ enrolmentCategoryTypeKey + "; modeOfDeliveryTypeKey: " + modeOfDeliveryTypeKey);
+			return;
+		}
+		
+		StudentMarkInfo studentMarkInfo = new StudentMarkInfo();
+		studentMarkInfo.setModuleSubjectCode(moduleValues.get(0));
+		studentMarkInfo.setModuleNumber(moduleValues.get(1));
+		studentMarkInfo.setAcademicPeriod(academicPeriodInfo);
+		studentMarkInfo.setEnrolmentCategoryTypeKey(enrolmentCategoryTypeKey);
+		studentMarkInfo.setModeOfDeliveryTypeKey(modeOfDeliveryTypeKey);
+		studentMarkInfo.setTermTypeKey(moduleOfferingInfo.getTermTypeKey());
+		studentMarkInfo.setModuleOrgEnt(Integer.parseInt(moduleOfferingInfo.getModuleOrgEnt()));
+		studentMarkInfo.setModuleSite(Integer.parseInt(moduleSite));
+		studentMarkInfo.setClassGroupDescription("Complete");
+		studentMarkInfo.setLanguageTypeKey("vss.code.LANGUAGE.2");
+		studentMarkInfo.setEvaluationDesc(evalDescr);		
+		studentMarkInfo.setEvaluationShortDesc(evalShortDescr);
+		studentMarkInfo.setEvaluationCutOffDate(Date.from(dueDate.atZone(ZoneId.systemDefault()).toInstant()));
+		studentMarkInfo.setEvaluationMarkOutOff((int) total);
+		studentMarkInfo.setEvaluationNoOfSubmissions(1);
+		studentMarkInfo.setEvaluationSubminimum(0);
+		studentMarkInfo.setEvaluationAssessmentDateTime(Date.from(recordedDate.atZone(ZoneId.systemDefault()).toInstant()));
+		studentMarkInfo.setEvaluationIsRequiredForExam(true);
+		studentMarkInfo.setStudentAndMark(studentGradeMap);
+		studentMarkInfo.setMetaInfo(metaInfo);
+
+		try {
+			MaintainStudentResponseWrapper result = studentAssessmentServiceCRUDService.maintainStudentMark(studentMarkInfo,
+					contextInfo);
+
+			HashMap<String, String> maintainStudentResponse = result.getMaintainStudentResponse();
+			if (maintainStudentResponse == null) {
+				log.error(
+						"Response from republishGrades is empty for siteId: " + siteId + "; siteTitle: " + siteTitle + "; module: "
+								+ module + "; evalDescr: " + evalDescr + "; studentGradeMap: " + studentGradeMap);
+
+				updateNWUGradebookRecordsWithStatus(siteId, module, studentGradeMap, NWUGradebookRecord.STATUS_FAIL,
+						"MaintainStudentResponse is null");
+			} else {
+				updateNWUGradebookRecords(siteId, module, maintainStudentResponse);
+			}
+
+		} catch (DoesNotExistException | InvalidParameterException | MissingParameterException | OperationFailedException
+				| PermissionDeniedException e) {
+			log.error("Grades could not be republished, see error log for siteTitle: " + siteTitle + "; evalDescr: "
+					+ evalDescr, e);
+
+			updateNWUGradebookRecordsWithStatus(siteId, module, studentGradeMap, NWUGradebookRecord.STATUS_FAIL, e.getMessage());
+		} catch (Exception e) {
+			log.error("Grades could not be republished, see error log for siteTitle: " + siteTitle + "; evalDescr: "
+					+ evalDescr, e);
+
+			updateNWUGradebookRecordsWithStatus(siteId, module, studentGradeMap, NWUGradebookRecord.STATUS_FAIL, e.getMessage());
+		}
+
+		log.info("republishGrades end");
 	}
 
 	/**

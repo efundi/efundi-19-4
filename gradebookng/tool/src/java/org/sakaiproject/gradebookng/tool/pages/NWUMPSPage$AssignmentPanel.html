@@ -1,10 +1,11 @@
 <wicket:panel xmlns:wicket="http://wicket.apache.org">
 
 	<div>
-		<input type="submit" wicket:id="send-marks"
-			wicket:message="value:button.publishMarks" />
+		<button wicket:id="sendMarks" class="button_color">
+        	<wicket:message key="button.publishMarks" />
+        </button>
 	</div>
-
+	
 	<br />
 
 	<table wicket:id="assignments-table" class="dataview table"></table>

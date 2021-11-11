@@ -6,9 +6,12 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.text.SimpleDateFormat;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
@@ -38,10 +41,14 @@ import assemble.edu.exceptions.InvalidParameterException;
 import assemble.edu.exceptions.MissingParameterException;
 import assemble.edu.exceptions.OperationFailedException;
 import assemble.edu.exceptions.PermissionDeniedException;
+import nwu.student.assesment.service.StudentAssessmentService;
 import nwu.student.assesment.service.crud.StudentAssessmentServiceCRUD;
 import nwu.student.assesment.service.crud.factory.StudentAssessmentCRUDServiceClientFactory;
+import nwu.student.assesment.service.dto.ClassGroupCourseCriteriaInfo;
+import nwu.student.assesment.service.dto.ClassGroupInfo;
 import nwu.student.assesment.service.dto.MaintainStudentResponseWrapper;
 import nwu.student.assesment.service.dto.StudentMarkInfo;
+import nwu.student.assesment.service.factory.StudentAssessmentServiceClientFactory;
 
 /**
  * @author Joseph Gillman
@@ -49,10 +56,11 @@ import nwu.student.assesment.service.dto.StudentMarkInfo;
 public final class NWUGradebookPublishUtil {
 	private static final Logger log = LogManager.getLogger(NWUGradebookPublishUtil.class);
 
-    private static NWUGradebookPublishUtil INSTANCE;
-    
+	private static NWUGradebookPublishUtil INSTANCE;
+
 	private static Connection connection = null;
 	private static PropertiesHolder properties = new PropertiesHolder();
+	private static StudentAssessmentService studentAssessmentService = null;
 	private static StudentAssessmentServiceCRUD studentAssessmentServiceCRUDService = null;
 	private static AcademicPeriodInfo academicPeriodInfo = null;
 	private static MetaInfo metaInfo = null;
@@ -61,9 +69,12 @@ public final class NWUGradebookPublishUtil {
 	private Map<Long, List<NWUGradebookRecord>> studentInfoMap = null;
 	private static boolean initializeSuccess = false;
 	private static String dbUrl, dbUsername, dbPassword;
-	
+	private SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd");
+
 	public final static String SUCCESS = "SUCCESS";
 	public final static String ERROR = "ERROR";
+
+	public final static String SYSTEM_LANGUAGE_TYPE_KEY = "vss.code.LANGUAGE.2";
 
 	private final static String STUDENT_GRDB_MARKS_SELECT = "SELECT gr.STUDENT_ID, gr.POINTS_EARNED, gr.GRADABLE_OBJECT_ID, gr.DATE_RECORDED, go.NAME, go.POINTS_POSSIBLE, go.DUE_DATE "
 			+ " FROM gb_grade_record_t gr JOIN gb_gradable_object_t go ON go.ID = gr.GRADABLE_OBJECT_ID JOIN gb_grade_map_t gm ON gm.GRADEBOOK_ID = go.GRADEBOOK_ID JOIN gb_gradebook_t g ON "
@@ -74,17 +85,16 @@ public final class NWUGradebookPublishUtil {
 			+ "TOTAL_MARK, GRADABLE_OBJECT_ID, RECORDED_DATE, DUE_DATE, CREATED_DATE, STATUS, RETRY_COUNT) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
 	private final static String NWU_GRDB_RECORDS_GRADE_UPDATE = "UPDATE NWU_GRADEBOOK_DATA SET GRADE = ?, RECORDED_DATE = ?, MODIFIED_DATE = ?, STATUS = ? WHERE ID = ?";
 	private final static String NWU_GRDB_RECORDS_STATUS_UPDATE = "UPDATE NWU_GRADEBOOK_DATA SET STATUS = ?, MODIFIED_DATE = ?, DESCRIPTION = ? WHERE SITE_ID = ? AND STUDENT_NUMBER = ? AND MODULE = ? AND RETRY_COUNT = RETRY_COUNT + 1";
-	
+
 	private final static String NWU_GRDB_INFO_SELECT = "SELECT * FROM NWU_GRADEBOOK_DATA WHERE SITE_ID = ? AND GRADABLE_OBJECT_ID = ?";
 
 	private final static String SITE_TITLE_SELECT = "SELECT TITLE FROM sakai_site where SITE_ID = ?";
-	
+
 	private final static String NWU_EVAL_DESCR_SELECT = "SELECT EVAL_DESCR FROM nwu_site_evaluation where SITE_ID = ? AND MODULE = ?";
 	private final static String NWU_EVAL_DESCRID_SELECT = "SELECT ID FROM nwu_site_evaluation where SITE_ID = ? AND MODULE = ? AND EVAL_DESCR = ?";
 	private final static String NWU_SITE_EVAL_INSERT = "INSERT INTO nwu_site_evaluation (SITE_ID, MODULE, EVAL_DESCR) VALUES (?,?,?)";
 
 	/**
-	 * 
 	 * @param dbUrl
 	 * @param dbUsername
 	 * @param dbPassword
@@ -94,13 +104,13 @@ public final class NWUGradebookPublishUtil {
 		this.dbUsername = dbUsername;
 		this.dbPassword = dbPassword;
 	}
-	
+
 	public static NWUGradebookPublishUtil getInstance(String dbUrl, String dbUsername, String dbPassword) {
-        if(INSTANCE == null) {
-            INSTANCE = new NWUGradebookPublishUtil(dbUrl, dbUsername, dbPassword);
-        }
-        return INSTANCE;
-    }
+		if (INSTANCE == null) {
+			INSTANCE = new NWUGradebookPublishUtil(dbUrl, dbUsername, dbPassword);
+		}
+		return INSTANCE;
+	}
 
 	/**
 	 * Get studentInfo for assignmentIds
@@ -151,11 +161,11 @@ public final class NWUGradebookPublishUtil {
 					gradebookRecord.setDescription(studentGBMarksInfoResultSet.getString("DESCRIPTION"));
 					studentInfoList.add(gradebookRecord);
 				}
-				if(!studentInfoList.isEmpty()) {
+				if (!studentInfoList.isEmpty()) {
 					studentInfoMap.put(assignmentId, studentInfoList);
 				}
 			}
-			
+
 		} catch (Exception e) {
 			log.error("Could not get student info, see error log for siteId: " + siteId + "; assignmentIds: " + assignmentIds, e);
 		} finally {
@@ -169,7 +179,8 @@ public final class NWUGradebookPublishUtil {
 				}
 				closeDatabaseConnection();
 			} catch (SQLException e) {
-				log.error("Could not get student info, see error log for siteId: " + siteId + "; assignmentIds: " + assignmentIds, e);
+				log.error("Could not get student info, see error log for siteId: " + siteId + "; assignmentIds: " + assignmentIds,
+						e);
 			}
 		}
 		return studentInfoMap;
@@ -183,8 +194,8 @@ public final class NWUGradebookPublishUtil {
 	 */
 	public String publishGradebookDataToMPS(String siteId, Map<String, List<String>> sectionUsersMap,
 			List<String> assignmentIds) {
-		
-		if(!initializeSuccess) {
+
+		if (!initializeSuccess) {
 			initializeSuccess = initializeWebserviceObjects();
 			if (!initializeSuccess) {
 				log.error("initializeWebserviceObjects was unsuccessful, please see error log");
@@ -212,8 +223,17 @@ public final class NWUGradebookPublishUtil {
 			LocalDateTime dueDate = null;
 			LocalDateTime recordedDate = null;
 			List<String> moduleValues = null;
-			
+
 			siteTitle = getSiteTitle(siteId);
+
+			LocalDate now = LocalDate.now();
+			ZoneId defaultZoneId = ZoneId.systemDefault();
+
+			LocalDate firstDayOfYear = now.with(TemporalAdjusters.firstDayOfYear());
+			Date startDate = Date.from(firstDayOfYear.atStartOfDay(defaultZoneId).toInstant());
+
+			LocalDate lastDayOfYear = now.with(TemporalAdjusters.lastDayOfYear());
+			Date endDate = Date.from(lastDayOfYear.atStartOfDay(defaultZoneId).toInstant());
 
 			for (Map.Entry<String, List<String>> moduleEntry : sectionUsersMap.entrySet()) {
 
@@ -227,31 +247,32 @@ public final class NWUGradebookPublishUtil {
 
 					assessmentName = null;
 					evalDescr = null;
-					// # Get all student numbers and their grades for siteId and the date recorded between start and end date					
+					// # Get all student numbers and their grades for siteId and the date recorded between start and end date
 					StringBuilder sbSql = new StringBuilder();
-					sbSql.append(STUDENT_GRDB_MARKS_SELECT);					
-					
-					for( int i = 0; i < studentNumbersForModule.size(); i++ ) {
-					  if( i > 0 ) sbSql.append( "," );
-					  sbSql.append( " ?" );
+					sbSql.append(STUDENT_GRDB_MARKS_SELECT);
+
+					for (int i = 0; i < studentNumbersForModule.size(); i++) {
+						if (i > 0)
+							sbSql.append(",");
+						sbSql.append(" ?");
 					}
-					sbSql.append( " ) " );
-					studentGradebookMarksPrepStmt = connection.prepareStatement( sbSql.toString() );
-			        
+					sbSql.append(" ) ");
+					studentGradebookMarksPrepStmt = connection.prepareStatement(sbSql.toString());
+
 					int counter = 1;
 					studentGradebookMarksPrepStmt.setInt(counter++, Integer.parseInt(assignmentId));
 					studentGradebookMarksPrepStmt.setString(counter++, siteId);
 
-					for( int i = 0; i < studentNumbersForModule.size(); i++ ) {
-						studentGradebookMarksPrepStmt.setString(counter++, studentNumbersForModule.get(i) );
+					for (int i = 0; i < studentNumbersForModule.size(); i++) {
+						studentGradebookMarksPrepStmt.setString(counter++, studentNumbersForModule.get(i));
 					}
 					studentGradebookMarksResultSet = studentGradebookMarksPrepStmt.executeQuery();
-					
+
 					if (studentGradebookMarksResultSet.next() == false) {
 						System.out.println("ResultSet in empty");
 
-				        System.out.println(sbSql.toString());
-				        System.out.println(studentNumbersForModule);				        
+						System.out.println(sbSql.toString());
+						System.out.println(studentNumbersForModule);
 
 						log.info("No Grades found and published to MPS, see error log for siteId: " + siteId + "; assignmentIds: "
 								+ assignmentIds);
@@ -262,11 +283,11 @@ public final class NWUGradebookPublishUtil {
 							grade = studentGradebookMarksResultSet.getDouble("POINTS_EARNED");
 							recordedDate = studentGradebookMarksResultSet.getTimestamp("DATE_RECORDED").toLocalDateTime();
 							assessmentName = studentGradebookMarksResultSet.getString("NAME");
-							
-							if(evalDescr == null) {
+
+							if (evalDescr == null) {
 								evalDescr = getEvaluationDesc(assessmentName);
-							} 
-							
+							}
+
 							total = studentGradebookMarksResultSet.getDouble("POINTS_POSSIBLE");
 							dueDate = studentGradebookMarksResultSet.getTimestamp("DUE_DATE").toLocalDateTime();
 							gradableObjectId = studentGradebookMarksResultSet.getInt("GRADABLE_OBJECT_ID");
@@ -287,7 +308,8 @@ public final class NWUGradebookPublishUtil {
 									LocalDateTime existingRecordedDate = nwuGradebookRecordsSelectResultSet
 											.getTimestamp("RECORDED_DATE").toLocalDateTime();
 
-									// # If the grade and recordedDate differ, update NWU_GRADEBOOK_DATA record and add to map for WS
+									// # If the grade and recordedDate differ, update NWU_GRADEBOOK_DATA record and add to map for
+									// WS
 									if (existingGrade != grade
 											|| (existingRecordedDate != null && !existingRecordedDate.isEqual(recordedDate))) {
 
@@ -300,7 +322,7 @@ public final class NWUGradebookPublishUtil {
 								insertNWUGradebookData(siteId, siteTitle, studentNumber, assessmentName, studentGradeMap, grade,
 										total, evalDescrId, dueDate, recordedDate, gradableObjectId, module);
 							}
-						
+
 						} while (studentGradebookMarksResultSet.next());
 					}
 
@@ -312,7 +334,7 @@ public final class NWUGradebookPublishUtil {
 						// # If the INSERT was successful and studentGradeMap not empty, send student grades/data via Webservice
 						// StudentAssessmentServiceCRUD
 						publishGrades(siteId, module, moduleValues, studentGradeMap, siteTitle, evalDescr, evalShortDescr, total,
-								dueDate, recordedDate);
+								dueDate, recordedDate, startDate, endDate);
 					}
 				}
 
@@ -345,20 +367,20 @@ public final class NWUGradebookPublishUtil {
 				log.error("Grades could not be published to MPS, see error log for siteId: " + siteId + "; assignmentIds: "
 						+ assignmentIds, e);
 				return ERROR;
-			}			
+			}
 		}
 		return SUCCESS;
 	}
-	
+
 	/**
 	 * @param siteId
 	 * @param sectionUsersMap
-	 * @param assignmentId 
+	 * @param assignmentId
 	 * @param selectedStudentInfoIds
 	 * @throws SQLException
 	 */
-	public String republishGradebookDataToMPS(String siteId, Map<String, List<String>> sectionUsersMap,
-			String assignmentId, List<String> selectedStudentInfoIds) {
+	public String republishGradebookDataToMPS(String siteId, Map<String, List<String>> sectionUsersMap, String assignmentId,
+			List<String> selectedStudentInfoIds) {
 
 		if (!initializeSuccess) {
 			initializeSuccess = initializeWebserviceObjects();
@@ -391,6 +413,15 @@ public final class NWUGradebookPublishUtil {
 			List<String> moduleValues = null;
 
 			siteTitle = getSiteTitle(siteId);
+
+			LocalDate now = LocalDate.now();
+			ZoneId defaultZoneId = ZoneId.systemDefault();
+
+			LocalDate firstDayOfYear = now.with(TemporalAdjusters.firstDayOfYear());
+			Date startDate = Date.from(firstDayOfYear.atStartOfDay(defaultZoneId).toInstant());
+
+			LocalDate lastDayOfYear = now.with(TemporalAdjusters.lastDayOfYear());
+			Date endDate = Date.from(lastDayOfYear.atStartOfDay(defaultZoneId).toInstant());
 
 			for (Map.Entry<String, List<String>> moduleEntry : sectionUsersMap.entrySet()) {
 
@@ -494,7 +525,7 @@ public final class NWUGradebookPublishUtil {
 					// # If the INSERT was successful and studentGradeMap not empty, send student grades/data via Webservice
 					// StudentAssessmentServiceCRUD
 					republishGrades(siteId, module, moduleValues, studentGradeMap, siteTitle, evalDescr, evalShortDescr, total,
-							dueDate, recordedDate);
+							dueDate, recordedDate, startDate, endDate);
 				}
 
 				log.info("Republishing NWU Gradebook Data complete! Finished at " + dtf.format(LocalDateTime.now()));
@@ -532,20 +563,21 @@ public final class NWUGradebookPublishUtil {
 	}
 
 	/**
-	 * 
 	 * @param selectedStudentNumbersForModule
 	 * @param selectedStudentInfoIds
 	 * @param studentNumbersForModule
 	 * @return
 	 */
-	private void getStudentNumbersForModule(List<String> selectedStudentNumbersForModule, List<String> selectedStudentInfoIds, List<String> studentNumbersForModule) {
-		
-		if(selectedStudentInfoIds == null || selectedStudentInfoIds.isEmpty() || studentNumbersForModule == null || studentNumbersForModule.isEmpty()) {
+	private void getStudentNumbersForModule(List<String> selectedStudentNumbersForModule, List<String> selectedStudentInfoIds,
+			List<String> studentNumbersForModule) {
+
+		if (selectedStudentInfoIds == null || selectedStudentInfoIds.isEmpty() || studentNumbersForModule == null
+				|| studentNumbersForModule.isEmpty()) {
 			return;
 		}
-		
+
 		for (String studentInfoId : selectedStudentInfoIds) {
-			if(studentNumbersForModule.contains(studentInfoId)) {
+			if (studentNumbersForModule.contains(studentInfoId)) {
 				selectedStudentNumbersForModule.add(studentInfoId);
 			}
 		}
@@ -559,7 +591,7 @@ public final class NWUGradebookPublishUtil {
 	 */
 	private String getEvaluationDesc(String assessmentName) {
 		String evaluationDesc = null;
-		if(assessmentName!= null && assessmentName.length() > 38) {
+		if (assessmentName != null && assessmentName.length() > 38) {
 			evaluationDesc = assessmentName.substring(0, 38);
 		} else {
 			evaluationDesc = assessmentName;
@@ -578,10 +610,12 @@ public final class NWUGradebookPublishUtil {
 	 * @param total
 	 * @param dueDate
 	 * @param recordedDate
+	 * @param endDate
+	 * @param startDate
 	 */
 	private static void publishGrades(String siteId, String module, List<String> moduleValues,
 			HashMap<Integer, Double> studentGradeMap, String siteTitle, String evalDescr, String evalShortDescr, double total,
-			LocalDateTime dueDate, LocalDateTime recordedDate) {
+			LocalDateTime dueDate, LocalDateTime recordedDate, Date startDate, Date endDate) {
 
 		log.info("publishGrades start");
 		log.info("		siteId = " + siteId);
@@ -603,14 +637,24 @@ public final class NWUGradebookPublishUtil {
 				moduleValues.get(1), moduleSite, enrolmentCategoryTypeKey, modeOfDeliveryTypeKey, contextInfo);
 
 		if (moduleOfferingInfo == null) {
-			log.error("Grades could not be published, see error log for siteTitle: " + siteTitle + "; evalDescr: "
-					+ evalDescr);
+			log.error("Grades could not be published, see error log for siteTitle: " + siteTitle + "; evalDescr: " + evalDescr);
 			log.error("Could not find ModuleOfferingInfo, see error log for subjectCode: " + moduleValues.get(0)
 					+ "; moduleNumber: " + moduleValues.get(1) + "; moduleSite: " + moduleSite + "; enrolmentCategoryTypeKey: "
 					+ enrolmentCategoryTypeKey + "; modeOfDeliveryTypeKey: " + modeOfDeliveryTypeKey);
 			return;
 		}
-		
+
+		String classGroupDescr = getClassGroupDescription(startDate, endDate, modeOfDeliveryTypeKey, enrolmentCategoryTypeKey,
+				moduleValues.get(0), moduleSite);
+		if (classGroupDescr == null) {
+			log.error("Grades could not be published, see error log for siteTitle: " + siteTitle + "; evalDescr: " + evalDescr);
+			log.error("Could not get getClassGroupDescription, see error log for subjectCode: " + moduleValues.get(0)
+					+ "; moduleNumber: " + moduleValues.get(1) + "; moduleSite: " + moduleSite + "; enrolmentCategoryTypeKey: "
+					+ enrolmentCategoryTypeKey + "; modeOfDeliveryTypeKey: " + modeOfDeliveryTypeKey + "; moduleSite: "
+					+ moduleSite);
+			return;
+		}
+
 		StudentMarkInfo studentMarkInfo = new StudentMarkInfo();
 		studentMarkInfo.setModuleSubjectCode(moduleValues.get(0));
 		studentMarkInfo.setModuleNumber(moduleValues.get(1));
@@ -620,9 +664,9 @@ public final class NWUGradebookPublishUtil {
 		studentMarkInfo.setTermTypeKey(moduleOfferingInfo.getTermTypeKey());
 		studentMarkInfo.setModuleOrgEnt(Integer.parseInt(moduleOfferingInfo.getModuleOrgEnt()));
 		studentMarkInfo.setModuleSite(Integer.parseInt(moduleSite));
-		studentMarkInfo.setClassGroupDescription("Complete");
-		studentMarkInfo.setLanguageTypeKey("vss.code.LANGUAGE.2");
-		studentMarkInfo.setEvaluationDesc(evalDescr);		
+		studentMarkInfo.setClassGroupDescription(classGroupDescr);
+		studentMarkInfo.setLanguageTypeKey(SYSTEM_LANGUAGE_TYPE_KEY);
+		studentMarkInfo.setEvaluationDesc(evalDescr);
 		studentMarkInfo.setEvaluationShortDesc(evalShortDescr);
 		studentMarkInfo.setEvaluationCutOffDate(Date.from(dueDate.atZone(ZoneId.systemDefault()).toInstant()));
 		studentMarkInfo.setEvaluationMarkOutOff((int) total);
@@ -639,9 +683,8 @@ public final class NWUGradebookPublishUtil {
 
 			HashMap<String, String> maintainStudentResponse = result.getMaintainStudentResponse();
 			if (maintainStudentResponse == null) {
-				log.error(
-						"Response from publishGrades is empty for siteId: " + siteId + "; siteTitle: " + siteTitle + "; module: "
-								+ module + "; evalDescr: " + evalDescr + "; studentGradeMap: " + studentGradeMap);
+				log.error("Response from publishGrades is empty for siteId: " + siteId + "; siteTitle: " + siteTitle
+						+ "; module: " + module + "; evalDescr: " + evalDescr + "; studentGradeMap: " + studentGradeMap);
 
 				updateNWUGradebookRecordsWithStatus(siteId, module, studentGradeMap, NWUGradebookRecord.STATUS_FAIL,
 						"MaintainStudentResponse is null");
@@ -651,20 +694,66 @@ public final class NWUGradebookPublishUtil {
 
 		} catch (DoesNotExistException | InvalidParameterException | MissingParameterException | OperationFailedException
 				| PermissionDeniedException e) {
-			log.error("Grades could not be published, see error log for siteTitle: " + siteTitle + "; evalDescr: "
-					+ evalDescr, e);
+			log.error("Grades could not be published, see error log for siteTitle: " + siteTitle + "; evalDescr: " + evalDescr,
+					e);
 
 			updateNWUGradebookRecordsWithStatus(siteId, module, studentGradeMap, NWUGradebookRecord.STATUS_FAIL, e.getMessage());
 		} catch (Exception e) {
-			log.error("Grades could not be published, see error log for siteTitle: " + siteTitle + "; evalDescr: "
-					+ evalDescr, e);
+			log.error("Grades could not be published, see error log for siteTitle: " + siteTitle + "; evalDescr: " + evalDescr,
+					e);
 
 			updateNWUGradebookRecordsWithStatus(siteId, module, studentGradeMap, NWUGradebookRecord.STATUS_FAIL, e.getMessage());
 		}
 
 		log.info("publishGrades end");
 	}
-	
+
+	/**
+	 * @param startDate
+	 * @param endDate
+	 * @param modeOfDeliveryTypeKey
+	 * @param enrolmentCategoryTypeKey
+	 * @param moduleCode
+	 * @param moduleSite
+	 * @return
+	 */
+	private static String getClassGroupDescription(Date startDate, Date endDate, String modeOfDeliveryTypeKey,
+			String enrolmentCategoryTypeKey, String moduleCode, String moduleSite) {
+
+		ClassGroupCourseCriteriaInfo info = new ClassGroupCourseCriteriaInfo();
+		info.setStartDate(startDate);
+		info.setEndDate(endDate);
+		info.setPresentationCategoryTypeKey(modeOfDeliveryTypeKey);
+		info.setEnrolmentCategoryTypeKey(enrolmentCategoryTypeKey);
+		info.setModuleCode(enrolmentCategoryTypeKey);
+		info.setSite(Integer.parseInt(moduleSite));
+
+		try {
+			List<ClassGroupInfo> result = studentAssessmentService.searchClassGroupsByCourseCriteria(info,
+					SYSTEM_LANGUAGE_TYPE_KEY, contextInfo);
+
+			if (result == null || result.isEmpty()) {
+				return null;
+			}
+
+			// Get first element in list and return ClassGroupDescription
+			ClassGroupInfo classGroupInfo = result.get(0);
+			return classGroupInfo.getClassGroupDescription();
+
+		} catch (DoesNotExistException | InvalidParameterException | MissingParameterException | OperationFailedException
+				| PermissionDeniedException e) {
+			log.error("Could not find ClassGroupDescription, see error log for startDate: " + startDate + "; endDate: " + endDate
+					+ "; moduleCode: " + moduleCode + "; moduleSite: " + moduleSite + "; enrolmentCategoryTypeKey: "
+					+ enrolmentCategoryTypeKey + "; modeOfDeliveryTypeKey: " + modeOfDeliveryTypeKey);
+
+		} catch (Exception e) {
+			log.error("Could not find ClassGroupDescription, see error log for startDate: " + startDate + "; endDate: " + endDate
+					+ "; moduleCode: " + moduleCode + "; moduleSite: " + moduleSite + "; enrolmentCategoryTypeKey: "
+					+ enrolmentCategoryTypeKey + "; modeOfDeliveryTypeKey: " + modeOfDeliveryTypeKey);
+		}
+		return null;
+	}
+
 	/**
 	 * @param siteId
 	 * @param module
@@ -676,10 +765,12 @@ public final class NWUGradebookPublishUtil {
 	 * @param total
 	 * @param dueDate
 	 * @param recordedDate
+	 * @param endDate
+	 * @param startDate
 	 */
 	private void republishGrades(String siteId, String module, List<String> moduleValues,
 			HashMap<Integer, Double> studentGradeMap, String siteTitle, String evalDescr, String evalShortDescr, double total,
-			LocalDateTime dueDate, LocalDateTime recordedDate) {
+			LocalDateTime dueDate, LocalDateTime recordedDate, Date startDate, Date endDate) {
 		log.info("republishGrades start");
 		log.info("		siteId = " + siteId);
 		log.info("		module = " + module);
@@ -700,14 +791,24 @@ public final class NWUGradebookPublishUtil {
 				moduleValues.get(1), moduleSite, enrolmentCategoryTypeKey, modeOfDeliveryTypeKey, contextInfo);
 
 		if (moduleOfferingInfo == null) {
-			log.error("Grades could not be republished, see error log for siteTitle: " + siteTitle + "; evalDescr: "
-					+ evalDescr);
+			log.error("Grades could not be republished, see error log for siteTitle: " + siteTitle + "; evalDescr: " + evalDescr);
 			log.error("Could not find ModuleOfferingInfo, see error log for subjectCode: " + moduleValues.get(0)
 					+ "; moduleNumber: " + moduleValues.get(1) + "; moduleSite: " + moduleSite + "; enrolmentCategoryTypeKey: "
 					+ enrolmentCategoryTypeKey + "; modeOfDeliveryTypeKey: " + modeOfDeliveryTypeKey);
 			return;
 		}
-		
+
+		String classGroupDescr = getClassGroupDescription(startDate, endDate, modeOfDeliveryTypeKey, enrolmentCategoryTypeKey,
+				moduleValues.get(0), moduleSite);
+		if (classGroupDescr == null) {
+			log.error("Grades could not be republished, see error log for siteTitle: " + siteTitle + "; evalDescr: " + evalDescr);
+			log.error("Could not get getClassGroupDescription, see error log for subjectCode: " + moduleValues.get(0)
+					+ "; moduleNumber: " + moduleValues.get(1) + "; moduleSite: " + moduleSite + "; enrolmentCategoryTypeKey: "
+					+ enrolmentCategoryTypeKey + "; modeOfDeliveryTypeKey: " + modeOfDeliveryTypeKey + "; moduleSite: "
+					+ moduleSite);
+			return;
+		}
+
 		StudentMarkInfo studentMarkInfo = new StudentMarkInfo();
 		studentMarkInfo.setModuleSubjectCode(moduleValues.get(0));
 		studentMarkInfo.setModuleNumber(moduleValues.get(1));
@@ -717,9 +818,9 @@ public final class NWUGradebookPublishUtil {
 		studentMarkInfo.setTermTypeKey(moduleOfferingInfo.getTermTypeKey());
 		studentMarkInfo.setModuleOrgEnt(Integer.parseInt(moduleOfferingInfo.getModuleOrgEnt()));
 		studentMarkInfo.setModuleSite(Integer.parseInt(moduleSite));
-		studentMarkInfo.setClassGroupDescription("Complete");
-		studentMarkInfo.setLanguageTypeKey("vss.code.LANGUAGE.2");
-		studentMarkInfo.setEvaluationDesc(evalDescr);		
+		studentMarkInfo.setClassGroupDescription(classGroupDescr);
+		studentMarkInfo.setLanguageTypeKey(SYSTEM_LANGUAGE_TYPE_KEY);
+		studentMarkInfo.setEvaluationDesc(evalDescr);
 		studentMarkInfo.setEvaluationShortDesc(evalShortDescr);
 		studentMarkInfo.setEvaluationCutOffDate(Date.from(dueDate.atZone(ZoneId.systemDefault()).toInstant()));
 		studentMarkInfo.setEvaluationMarkOutOff((int) total);
@@ -736,9 +837,8 @@ public final class NWUGradebookPublishUtil {
 
 			HashMap<String, String> maintainStudentResponse = result.getMaintainStudentResponse();
 			if (maintainStudentResponse == null) {
-				log.error(
-						"Response from republishGrades is empty for siteId: " + siteId + "; siteTitle: " + siteTitle + "; module: "
-								+ module + "; evalDescr: " + evalDescr + "; studentGradeMap: " + studentGradeMap);
+				log.error("Response from republishGrades is empty for siteId: " + siteId + "; siteTitle: " + siteTitle
+						+ "; module: " + module + "; evalDescr: " + evalDescr + "; studentGradeMap: " + studentGradeMap);
 
 				updateNWUGradebookRecordsWithStatus(siteId, module, studentGradeMap, NWUGradebookRecord.STATUS_FAIL,
 						"MaintainStudentResponse is null");
@@ -748,13 +848,13 @@ public final class NWUGradebookPublishUtil {
 
 		} catch (DoesNotExistException | InvalidParameterException | MissingParameterException | OperationFailedException
 				| PermissionDeniedException e) {
-			log.error("Grades could not be republished, see error log for siteTitle: " + siteTitle + "; evalDescr: "
-					+ evalDescr, e);
+			log.error("Grades could not be republished, see error log for siteTitle: " + siteTitle + "; evalDescr: " + evalDescr,
+					e);
 
 			updateNWUGradebookRecordsWithStatus(siteId, module, studentGradeMap, NWUGradebookRecord.STATUS_FAIL, e.getMessage());
 		} catch (Exception e) {
-			log.error("Grades could not be republished, see error log for siteTitle: " + siteTitle + "; evalDescr: "
-					+ evalDescr, e);
+			log.error("Grades could not be republished, see error log for siteTitle: " + siteTitle + "; evalDescr: " + evalDescr,
+					e);
 
 			updateNWUGradebookRecordsWithStatus(siteId, module, studentGradeMap, NWUGradebookRecord.STATUS_FAIL, e.getMessage());
 		}
@@ -860,8 +960,9 @@ public final class NWUGradebookPublishUtil {
 					nwuGradebookRecordsUpdateStatusPrepStmt.close();
 				}
 			} catch (SQLException e) {
-				log.error("Could not be update MPS Gradebook Records, see error log for siteId: " + siteId + "; module: "
-						+ module, e);
+				log.error(
+						"Could not be update MPS Gradebook Records, see error log for siteId: " + siteId + "; module: " + module,
+						e);
 			}
 		}
 	}
@@ -1008,8 +1109,8 @@ public final class NWUGradebookPublishUtil {
 					nwuGradebookRecordsInsertPrepStmt.close();
 				}
 			} catch (SQLException e) {
-				log.error("Could not insert NWU Gradebook data for: siteId: " + siteId + "; module: " + module + "; studentNumber: "
-						+ studentNumber + "; assessmentName: " + assessmentName, e);
+				log.error("Could not insert NWU Gradebook data for: siteId: " + siteId + "; module: " + module
+						+ "; studentNumber: " + studentNumber + "; assessmentName: " + assessmentName, e);
 			}
 		}
 	}
@@ -1029,6 +1130,37 @@ public final class NWUGradebookPublishUtil {
 			metaInfo = new MetaInfo();
 			metaInfo.setCreateId(properties.getWSMetaInfoCreateId());
 			metaInfo.setAuditFunction(properties.getWSMetaInfoAuditFunction());
+		}
+
+		if (studentAssessmentService == null) {
+			String studentServiceLookupKey = ServiceRegistryLookupUtility.getServiceRegistryLookupKey(
+					properties.getWSRuntimeEnvironment(), StudentAssessmentServiceClientFactory.STUDENTASSESSMENTSERVICE,
+					properties.getWSMajorVersion(), properties.getWSDatabase());
+
+			try {
+				studentAssessmentService = (StudentAssessmentService) GenericServiceClientFactory.getService(
+						studentServiceLookupKey, properties.getWSUsername(), properties.getWSPassword(),
+						StudentAssessmentService.class);
+			} catch (PermissionDeniedException e) {
+				log.error(
+						"initializeWebserviceObjects - Initializing StudentAssessmentService failed with PermissionDeniedException: ",
+						e);
+				return false;
+			} catch (DoesNotExistException e) {
+				log.error(
+						"initializeWebserviceObjects - Initializing StudentAssessmentService failed with DoesNotExistException: ",
+						e);
+				return false;
+			} catch (MissingParameterException e) {
+				log.error(
+						"initializeWebserviceObjects - Initializing StudentAssessmentService failed with MissingParameterException: ",
+						e);
+			} catch (OperationFailedException e) {
+				log.error(
+						"initializeWebserviceObjects - Initializing StudentAssessmentService failed with OperationFailedException: ",
+						e);
+				return false;
+			}
 		}
 
 		if (studentAssessmentServiceCRUDService == null) {
@@ -1122,7 +1254,6 @@ public final class NWUGradebookPublishUtil {
 	}
 
 	/**
-	 * 
 	 * @param siteId
 	 * @return
 	 * @throws SQLException
@@ -1132,19 +1263,18 @@ public final class NWUGradebookPublishUtil {
 		PreparedStatement siteTitlePrepStmt = connection.prepareStatement(SITE_TITLE_SELECT);
 		siteTitlePrepStmt.setString(1, siteId);
 		ResultSet siteTitleResultSet = siteTitlePrepStmt.executeQuery();
-		if (siteTitleResultSet.next()) {			
+		if (siteTitleResultSet.next()) {
 			return siteTitleResultSet.getString("TITLE");
-		}			
+		}
 		return null;
 	}
 
 	/**
-	 * 
 	 * @param siteId
 	 * @param module
 	 * @return
 	 */
-	private static String getEvalShortDesc(String siteId, String module) {		
+	private static String getEvalShortDesc(String siteId, String module) {
 		String evalShortDesc = null;
 		PreparedStatement prepStmt = null;
 		try {
@@ -1166,15 +1296,14 @@ public final class NWUGradebookPublishUtil {
 				log.error("Exception evaluation code for: siteId: " + siteId + "; module: " + module, e);
 			}
 		}
-		//if it does not exist, generate one
-		if(evalShortDesc == null) {
+		// if it does not exist, generate one
+		if (evalShortDesc == null) {
 			evalShortDesc = generateEvalShortDesc(siteId, module);
 		}
 		return evalShortDesc;
 	}
-	
+
 	/**
-	 * 
 	 * @param siteId
 	 * @param module
 	 * @param evalDescr
@@ -1206,13 +1335,12 @@ public final class NWUGradebookPublishUtil {
 	}
 
 	/**
-	 * 
 	 * @param siteId
 	 * @param module
 	 * @return
 	 */
 	private static String generateEvalShortDesc(String siteId, String module) {
-		String randomStr = RandomStringUtils.random(5, true, true);		
+		String randomStr = RandomStringUtils.random(5, true, true);
 		PreparedStatement prepStmt = null;
 		try {
 			prepStmt = connection.prepareStatement(NWU_SITE_EVAL_INSERT);
@@ -1235,8 +1363,8 @@ public final class NWUGradebookPublishUtil {
 					prepStmt.close();
 				}
 			} catch (SQLException e) {
-				log.error("Could not insert random evaluation code for: siteId: " + siteId + "; module: " + module + "; randomStr: "
-						+ randomStr, e);
+				log.error("Could not insert random evaluation code for: siteId: " + siteId + "; module: " + module
+						+ "; randomStr: " + randomStr, e);
 			}
 		}
 		return "ERROR";

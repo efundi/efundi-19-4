@@ -735,11 +735,15 @@ public final class NWUGradebookPublishUtil {
 					SYSTEM_LANGUAGE_TYPE_KEY, contextInfo);
 
 			if (result == null || result.isEmpty()) {
+				log.info("getClassGroupDescription result is empty");
 				return null;
 			}
 			
 			for (ClassGroupInfo classGroupInfo : result) {
 				if(classGroupInfo.getClassGroupTypeKey() != null && classGroupInfo.getClassGroupTypeKey().equals(CLASS_GROUP_TYPE_COMPLETE)) {
+					log.info("Found ClassGroupDescription, for startDate: " + startDate + "; endDate: " + endDate
+							+ "; moduleCode: " + moduleCode + "; moduleSite: " + moduleSite + "; enrolmentCategoryTypeKey: "
+							+ enrolmentCategoryTypeKey + "; modeOfDeliveryTypeKey: " + modeOfDeliveryTypeKey + "classGroupDescription: " + classGroupInfo.getClassGroupDescription());
 					return classGroupInfo.getClassGroupDescription();
 				}
 			}			
@@ -755,6 +759,9 @@ public final class NWUGradebookPublishUtil {
 					+ "; moduleCode: " + moduleCode + "; moduleSite: " + moduleSite + "; enrolmentCategoryTypeKey: "
 					+ enrolmentCategoryTypeKey + "; modeOfDeliveryTypeKey: " + modeOfDeliveryTypeKey);
 		}
+		log.info("Could not find ClassGroupDescription, see error log for startDate: " + startDate + "; endDate: " + endDate
+				+ "; moduleCode: " + moduleCode + "; moduleSite: " + moduleSite + "; enrolmentCategoryTypeKey: "
+				+ enrolmentCategoryTypeKey + "; modeOfDeliveryTypeKey: " + modeOfDeliveryTypeKey);
 		return null;
 	}
 

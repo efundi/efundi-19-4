@@ -75,7 +75,8 @@ public final class NWUGradebookPublishUtil {
 	public final static String ERROR = "ERROR";
 
 	public final static String SYSTEM_LANGUAGE_TYPE_KEY = "vss.code.LANGUAGE.2";
-	public final static String CLASS_GROUP_TYPE_COMPLETE = "vss.code.CLASSGROUPTYPE.V.Complete";	
+	public final static String CLASS_GROUP_TYPE_COMPLETE = "vss.code.CLASSGROUPTYPE.V.Complete";
+	public final static String CLASS_GROUP_TYPE_VOLLEDIG = "vss.code.CLASSGROUPTYPE.V.Volledig";
 
 	private final static String STUDENT_GRDB_MARKS_SELECT = "SELECT gr.STUDENT_ID, gr.POINTS_EARNED, gr.GRADABLE_OBJECT_ID, gr.DATE_RECORDED, go.NAME, go.POINTS_POSSIBLE, go.DUE_DATE "
 			+ " FROM gb_grade_record_t gr JOIN gb_gradable_object_t go ON go.ID = gr.GRADABLE_OBJECT_ID JOIN gb_grade_map_t gm ON gm.GRADEBOOK_ID = go.GRADEBOOK_ID JOIN gb_gradebook_t g ON "
@@ -740,7 +741,8 @@ public final class NWUGradebookPublishUtil {
 			}
 			
 			for (ClassGroupInfo classGroupInfo : result) {
-				if(classGroupInfo.getClassGroupTypeKey() != null && classGroupInfo.getClassGroupTypeKey().equals(CLASS_GROUP_TYPE_COMPLETE)) {
+				if(classGroupInfo.getClassGroupTypeKey() != null && (classGroupInfo.getClassGroupTypeKey().equals(CLASS_GROUP_TYPE_COMPLETE) || 
+						classGroupInfo.getClassGroupTypeKey().equals(CLASS_GROUP_TYPE_VOLLEDIG))) {
 					log.info("Found ClassGroupDescription, for startDate: " + startDate + "; endDate: " + endDate
 							+ "; moduleCode: " + moduleCode + "; moduleSite: " + moduleSite + "; enrolmentCategoryTypeKey: "
 							+ enrolmentCategoryTypeKey + "; modeOfDeliveryTypeKey: " + modeOfDeliveryTypeKey + "; classGroupDescription: " + classGroupInfo.getClassGroupDescription());

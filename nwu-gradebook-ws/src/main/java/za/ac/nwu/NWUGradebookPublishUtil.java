@@ -155,7 +155,8 @@ public final class NWUGradebookPublishUtil {
 					gradebookRecord.setRecordedDate(studentGBMarksInfoResultSet.getTimestamp("RECORDED_DATE").toLocalDateTime());
 					gradebookRecord.setDueDate(studentGBMarksInfoResultSet.getTimestamp("DUE_DATE").toLocalDateTime());
 					gradebookRecord.setCreatedDate(studentGBMarksInfoResultSet.getTimestamp("CREATED_DATE").toLocalDateTime());
-					gradebookRecord.setModifiedDate(studentGBMarksInfoResultSet.getTimestamp("MODIFIED_DATE").toLocalDateTime());
+					Timestamp modifiedDate = studentGBMarksInfoResultSet.getTimestamp("MODIFIED_DATE");
+					gradebookRecord.setModifiedDate(modifiedDate != null ? studentGBMarksInfoResultSet.getTimestamp("MODIFIED_DATE").toLocalDateTime() : null);
 					gradebookRecord.setStatus(studentGBMarksInfoResultSet.getString("STATUS"));
 					gradebookRecord.setRetryCount(studentGBMarksInfoResultSet.getInt("RETRY_COUNT"));
 					gradebookRecord.setDescription(studentGBMarksInfoResultSet.getString("DESCRIPTION"));

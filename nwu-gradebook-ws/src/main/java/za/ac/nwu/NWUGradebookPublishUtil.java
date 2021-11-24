@@ -743,7 +743,7 @@ public final class NWUGradebookPublishUtil {
 				if(classGroupInfo.getClassGroupTypeKey() != null && classGroupInfo.getClassGroupTypeKey().equals(CLASS_GROUP_TYPE_COMPLETE)) {
 					log.info("Found ClassGroupDescription, for startDate: " + startDate + "; endDate: " + endDate
 							+ "; moduleCode: " + moduleCode + "; moduleSite: " + moduleSite + "; enrolmentCategoryTypeKey: "
-							+ enrolmentCategoryTypeKey + "; modeOfDeliveryTypeKey: " + modeOfDeliveryTypeKey + "classGroupDescription: " + classGroupInfo.getClassGroupDescription());
+							+ enrolmentCategoryTypeKey + "; modeOfDeliveryTypeKey: " + modeOfDeliveryTypeKey + "; classGroupDescription: " + classGroupInfo.getClassGroupDescription());
 					return classGroupInfo.getClassGroupDescription();
 				}
 			}			

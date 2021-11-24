@@ -75,6 +75,7 @@ public final class NWUGradebookPublishUtil {
 	public final static String ERROR = "ERROR";
 
 	public final static String SYSTEM_LANGUAGE_TYPE_KEY = "vss.code.LANGUAGE.2";
+	public final static String CLASS_GROUP_TYPE_COMPLETE = "vss.code.CLASSGROUPTYPE.V.Complete";	
 
 	private final static String STUDENT_GRDB_MARKS_SELECT = "SELECT gr.STUDENT_ID, gr.POINTS_EARNED, gr.GRADABLE_OBJECT_ID, gr.DATE_RECORDED, go.NAME, go.POINTS_POSSIBLE, go.DUE_DATE "
 			+ " FROM gb_grade_record_t gr JOIN gb_gradable_object_t go ON go.ID = gr.GRADABLE_OBJECT_ID JOIN gb_grade_map_t gm ON gm.GRADEBOOK_ID = go.GRADEBOOK_ID JOIN gb_gradebook_t g ON "
@@ -644,9 +645,9 @@ public final class NWUGradebookPublishUtil {
 					+ enrolmentCategoryTypeKey + "; modeOfDeliveryTypeKey: " + modeOfDeliveryTypeKey);
 			return;
 		}
-
+		String moduleCode = moduleValues.get(0) + moduleValues.get(1);
 		String classGroupDescr = getClassGroupDescription(startDate, endDate, modeOfDeliveryTypeKey, enrolmentCategoryTypeKey,
-				moduleValues.get(0), moduleSite);
+				moduleCode, moduleSite);
 		if (classGroupDescr == null) {
 			log.error("Grades could not be published, see error log for siteTitle: " + siteTitle + "; evalDescr: " + evalDescr);
 			log.error("Could not get getClassGroupDescription, see error log for subjectCode: " + moduleValues.get(0)
@@ -726,7 +727,7 @@ public final class NWUGradebookPublishUtil {
 		info.setEndDate(endDate);
 		info.setPresentationCategoryTypeKey(modeOfDeliveryTypeKey);
 		info.setEnrolmentCategoryTypeKey(enrolmentCategoryTypeKey);
-		info.setModuleCode(enrolmentCategoryTypeKey);
+		info.setModuleCode(moduleCode);
 		info.setSite(Integer.parseInt(moduleSite));
 
 		try {
@@ -736,10 +737,12 @@ public final class NWUGradebookPublishUtil {
 			if (result == null || result.isEmpty()) {
 				return null;
 			}
-
-			// Get first element in list and return ClassGroupDescription
-			ClassGroupInfo classGroupInfo = result.get(0);
-			return classGroupInfo.getClassGroupDescription();
+			
+			for (ClassGroupInfo classGroupInfo : result) {
+				if(classGroupInfo.getClassGroupTypeKey() != null && classGroupInfo.getClassGroupTypeKey().equals(CLASS_GROUP_TYPE_COMPLETE)) {
+					return classGroupInfo.getClassGroupDescription();
+				}
+			}			
 
 		} catch (DoesNotExistException | InvalidParameterException | MissingParameterException | OperationFailedException
 				| PermissionDeniedException e) {
@@ -798,9 +801,9 @@ public final class NWUGradebookPublishUtil {
 					+ enrolmentCategoryTypeKey + "; modeOfDeliveryTypeKey: " + modeOfDeliveryTypeKey);
 			return;
 		}
-
+		String moduleCode = moduleValues.get(0) + moduleValues.get(1);
 		String classGroupDescr = getClassGroupDescription(startDate, endDate, modeOfDeliveryTypeKey, enrolmentCategoryTypeKey,
-				moduleValues.get(0), moduleSite);
+				moduleCode, moduleSite);
 		if (classGroupDescr == null) {
 			log.error("Grades could not be republished, see error log for siteTitle: " + siteTitle + "; evalDescr: " + evalDescr);
 			log.error("Could not get getClassGroupDescription, see error log for subjectCode: " + moduleValues.get(0)

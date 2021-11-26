@@ -666,7 +666,7 @@ public final class NWUGradebookPublishUtil {
 		studentMarkInfo.setModeOfDeliveryTypeKey(modeOfDeliveryTypeKey);
 		studentMarkInfo.setTermTypeKey(moduleOfferingInfo.getTermTypeKey());
 		studentMarkInfo.setModuleOrgEnt(Integer.parseInt(moduleOfferingInfo.getModuleOrgEnt()));
-		studentMarkInfo.setModuleSite(Integer.parseInt(moduleSite));
+		studentMarkInfo.setModuleSite(Integer.parseInt(moduleSite) * -1);
 		studentMarkInfo.setClassGroupDescription(classGroupDescr);
 		studentMarkInfo.setLanguageTypeKey(SYSTEM_LANGUAGE_TYPE_KEY);
 		studentMarkInfo.setEvaluationDesc(evalDescr);
@@ -853,7 +853,7 @@ public final class NWUGradebookPublishUtil {
 		studentMarkInfo.setModeOfDeliveryTypeKey(modeOfDeliveryTypeKey);
 		studentMarkInfo.setTermTypeKey(moduleOfferingInfo.getTermTypeKey());
 		studentMarkInfo.setModuleOrgEnt(Integer.parseInt(moduleOfferingInfo.getModuleOrgEnt()));
-		studentMarkInfo.setModuleSite(Integer.parseInt(moduleSite));
+		studentMarkInfo.setModuleSite(Integer.parseInt(moduleSite) * -1);
 		studentMarkInfo.setClassGroupDescription(classGroupDescr);
 		studentMarkInfo.setLanguageTypeKey(SYSTEM_LANGUAGE_TYPE_KEY);
 		studentMarkInfo.setEvaluationDesc(evalDescr);
@@ -1022,7 +1022,7 @@ public final class NWUGradebookPublishUtil {
 		searchCriteria.setAcademicPeriod(academicPeriodInfo);
 		searchCriteria.setModuleSubjectCode(subjectCode);
 		searchCriteria.setModuleNumber(moduleNumber);
-		searchCriteria.setModuleSite(moduleSite);
+		searchCriteria.setModuleSite("-" + moduleSite);
 		searchCriteria.setMethodOfDeliveryTypeKey(enrolmentCategoryTypeKey);
 		searchCriteria.setModeOfDeliveryTypeKey(modeOfDeliveryTypeKey);
 

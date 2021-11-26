@@ -681,6 +681,8 @@ public final class NWUGradebookPublishUtil {
 		studentMarkInfo.setMetaInfo(metaInfo);
 
 		try {
+			log.info("MaintainStudentMark: " + studentMarkInfo);
+			
 			MaintainStudentResponseWrapper result = studentAssessmentServiceCRUDService.maintainStudentMark(studentMarkInfo,
 					contextInfo);
 

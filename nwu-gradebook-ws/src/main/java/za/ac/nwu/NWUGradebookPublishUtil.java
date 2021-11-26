@@ -681,8 +681,7 @@ public final class NWUGradebookPublishUtil {
 		studentMarkInfo.setMetaInfo(metaInfo);
 
 		try {
-			log.info("MaintainStudentMark: " + studentMarkInfo);
-			
+			logMaintainStudentMarkData(studentGradeMap, studentMarkInfo);			
 			MaintainStudentResponseWrapper result = studentAssessmentServiceCRUDService.maintainStudentMark(studentMarkInfo,
 					contextInfo);
 
@@ -711,6 +710,28 @@ public final class NWUGradebookPublishUtil {
 		}
 
 		log.info("publishGrades end");
+	}
+
+	/**
+	 * 
+	 * @param studentGradeMap
+	 * @param studentMarkInfo
+	 */
+	private static void logMaintainStudentMarkData(HashMap<Integer, Double> studentGradeMap, StudentMarkInfo studentMarkInfo) {
+		log.info("MaintainStudentMark :: ModuleSubjectCode: " + studentMarkInfo.getModuleSubjectCode() + "; ModuleNumber: " + studentMarkInfo.getModuleNumber()
+		 + "; EnrolmentCategoryTypeKey: " + studentMarkInfo.getEnrolmentCategoryTypeKey() + "; ModeOfDeliveryTypeKey: " + studentMarkInfo.getModeOfDeliveryTypeKey()
+		 + "; TermTypeKey: " + studentMarkInfo.getTermTypeKey() + "; ModuleOrgEnt: " + studentMarkInfo.getModuleOrgEnt()
+		 + "; ModuleSite: " + studentMarkInfo.getModuleSite() + "; ClassGroupDescription: " + studentMarkInfo.getClassGroupDescription()
+		 + "; EvaluationDesc: " + studentMarkInfo.getEvaluationDesc() + "; EvaluationShortDesc: " + studentMarkInfo.getEvaluationShortDesc()
+		 + "; EvaluationCutOffDate: " + studentMarkInfo.getEvaluationCutOffDate() + "; EvaluationMarkOutOff: " + studentMarkInfo.getEvaluationMarkOutOff()
+		 + "; EvaluationAssessmentDateTime: " + studentMarkInfo.getEvaluationAssessmentDateTime());
+		
+		StringBuilder studentGradeMapStr = new StringBuilder("MaintainStudentMark :: StudentGradeMap : ");
+		for (Entry<Integer, Double> entry : studentGradeMap.entrySet()) {
+			studentGradeMapStr.append("(").append(entry.getKey()).append(",").append(entry.getValue()).append(") ");
+		}
+		
+		log.info(studentGradeMapStr);
 	}
 
 	/**
@@ -847,9 +868,10 @@ public final class NWUGradebookPublishUtil {
 		studentMarkInfo.setMetaInfo(metaInfo);
 
 		try {
+			logMaintainStudentMarkData(studentGradeMap, studentMarkInfo);	
 			MaintainStudentResponseWrapper result = studentAssessmentServiceCRUDService.maintainStudentMark(studentMarkInfo,
 					contextInfo);
-
+			
 			HashMap<String, String> maintainStudentResponse = result.getMaintainStudentResponse();
 			if (maintainStudentResponse == null) {
 				log.error("Response from republishGrades is empty for siteId: " + siteId + "; siteTitle: " + siteTitle

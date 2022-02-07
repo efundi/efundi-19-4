@@ -9,9 +9,9 @@ import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Year;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
@@ -78,15 +78,15 @@ public final class NWUGradebookPublishUtil {
 	public final static String CLASS_GROUP_TYPE_COMPLETE = "vss.code.CLASSGROUPTYPE.V.Complete";
 	public final static String CLASS_GROUP_TYPE_VOLLEDIG = "vss.code.CLASSGROUPTYPE.V.Volledig";
 
-	private final static String STUDENT_GRDB_MARKS_SELECT = "SELECT gr.STUDENT_ID, gr.POINTS_EARNED, gr.GRADABLE_OBJECT_ID, gr.DATE_RECORDED, go.NAME, go.POINTS_POSSIBLE, go.DUE_DATE "
+	private final static String STUDENT_GRDB_MARKS_SELECT = "SELECT su.EID, gr.POINTS_EARNED, gr.GRADABLE_OBJECT_ID, gr.DATE_RECORDED, go.NAME, go.POINTS_POSSIBLE, go.DUE_DATE "
 			+ " FROM gb_grade_record_t gr JOIN gb_gradable_object_t go ON go.ID = gr.GRADABLE_OBJECT_ID JOIN gb_grade_map_t gm ON gm.GRADEBOOK_ID = go.GRADEBOOK_ID JOIN gb_gradebook_t g ON "
-			+ " g.SELECTED_GRADE_MAPPING_ID = gm.ID WHERE go.ID = ? AND g.NAME = ? AND go.DUE_DATE IS NOT NULL AND gr.STUDENT_ID IN (";
+			+ " g.SELECTED_GRADE_MAPPING_ID = gm.ID JOIN sakai_user_id_map su ON su.USER_ID = gr.STUDENT_ID WHERE go.ID = ? AND g.NAME = ? AND go.DUE_DATE IS NOT NULL AND su.USER_ID IN (";
 
 	private final static String NWU_GRDB_RECORDS_SELECT = "SELECT * FROM NWU_GRADEBOOK_DATA WHERE SITE_ID = ? AND STUDENT_NUMBER = ? AND GRADABLE_OBJECT_ID = ? AND MODULE = ?";
 	private final static String NWU_GRDB_RECORDS_INSERT = "INSERT INTO NWU_GRADEBOOK_DATA (SITE_ID, SITE_TITLE, MODULE, ASSESSMENT_NAME, STUDENT_NUMBER, EVAL_DESCR_ID, GRADE, "
 			+ "TOTAL_MARK, GRADABLE_OBJECT_ID, RECORDED_DATE, DUE_DATE, CREATED_DATE, STATUS, RETRY_COUNT) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
 	private final static String NWU_GRDB_RECORDS_GRADE_UPDATE = "UPDATE NWU_GRADEBOOK_DATA SET GRADE = ?, RECORDED_DATE = ?, MODIFIED_DATE = ?, STATUS = ? WHERE ID = ?";
-	private final static String NWU_GRDB_RECORDS_STATUS_UPDATE = "UPDATE NWU_GRADEBOOK_DATA SET STATUS = ?, MODIFIED_DATE = ?, DESCRIPTION = ? WHERE SITE_ID = ? AND STUDENT_NUMBER = ? AND MODULE = ? AND RETRY_COUNT = RETRY_COUNT + 1";
+	private final static String NWU_GRDB_RECORDS_STATUS_UPDATE = "UPDATE NWU_GRADEBOOK_DATA SET STATUS = ?, MODIFIED_DATE = ?, DESCRIPTION = ?, RETRY_COUNT = RETRY_COUNT + 1 WHERE SITE_ID = ? AND STUDENT_NUMBER = ? AND MODULE = ?";
 
 	private final static String NWU_GRDB_INFO_SELECT = "SELECT * FROM NWU_GRADEBOOK_DATA WHERE SITE_ID = ? AND GRADABLE_OBJECT_ID = ?";
 
@@ -95,6 +95,8 @@ public final class NWUGradebookPublishUtil {
 	private final static String NWU_EVAL_DESCR_SELECT = "SELECT EVAL_DESCR FROM nwu_site_evaluation where SITE_ID = ? AND MODULE = ?";
 	private final static String NWU_EVAL_DESCRID_SELECT = "SELECT ID FROM nwu_site_evaluation where SITE_ID = ? AND MODULE = ? AND EVAL_DESCR = ?";
 	private final static String NWU_SITE_EVAL_INSERT = "INSERT INTO nwu_site_evaluation (SITE_ID, MODULE, EVAL_DESCR) VALUES (?,?,?)";
+
+	private final static String SAKAI_USER_ID_SELECT = "SELECT USER_ID FROM SAKAI_USER_ID_MAP WHERE EID = ?";
 
 	/**
 	 * @param dbUrl
@@ -233,7 +235,7 @@ public final class NWUGradebookPublishUtil {
 			ZoneId defaultZoneId = ZoneId.systemDefault();
 
 			LocalDate firstDayOfYear = now.with(TemporalAdjusters.firstDayOfYear());
-			Date startDate = Date.from(firstDayOfYear.atStartOfDay(defaultZoneId).toInstant());
+			Date startDate = Date.from(firstDayOfYear.atStartOfDay(defaultZoneId).toInstant());				
 
 			LocalDate lastDayOfYear = now.with(TemporalAdjusters.lastDayOfYear());
 			Date endDate = Date.from(lastDayOfYear.atStartOfDay(defaultZoneId).toInstant());
@@ -267,22 +269,19 @@ public final class NWUGradebookPublishUtil {
 					studentGradebookMarksPrepStmt.setString(counter++, siteId);
 
 					for (int i = 0; i < studentNumbersForModule.size(); i++) {
-						studentGradebookMarksPrepStmt.setString(counter++, studentNumbersForModule.get(i));
+						studentGradebookMarksPrepStmt.setString(counter++, getUUIDFromStudentNumber(studentNumbersForModule.get(i)));
 					}
 					studentGradebookMarksResultSet = studentGradebookMarksPrepStmt.executeQuery();
 
 					if (studentGradebookMarksResultSet.next() == false) {
-						System.out.println("ResultSet in empty");
-
-						System.out.println(sbSql.toString());
-						System.out.println(studentNumbersForModule);
-
 						log.info("No Grades found and published to MPS, see error log for siteId: " + siteId + "; assignmentIds: "
 								+ assignmentIds);
+						log.info("ResultSet in empty: " + sbSql.toString() + "; studentNumbersForModule: "
+								+ studentNumbersForModule);
 					} else {
 
 						do {
-							studentNumber = studentGradebookMarksResultSet.getString("STUDENT_ID");
+							studentNumber = studentGradebookMarksResultSet.getString("EID");
 							grade = studentGradebookMarksResultSet.getDouble("POINTS_EARNED");
 							recordedDate = studentGradebookMarksResultSet.getTimestamp("DATE_RECORDED").toLocalDateTime();
 							assessmentName = studentGradebookMarksResultSet.getString("NAME");
@@ -376,6 +375,36 @@ public final class NWUGradebookPublishUtil {
 	}
 
 	/**
+	 * @param studentNumber
+	 * @return
+	 */
+	private static String getUUIDFromStudentNumber(String studentNumber) {
+		PreparedStatement prepStmt = null;
+		try {
+			prepStmt = connection.prepareStatement(SAKAI_USER_ID_SELECT);
+			prepStmt.setString(1, studentNumber);
+			ResultSet resultSet = prepStmt.executeQuery();
+			if (resultSet.next()) {
+				return resultSet.getString("USER_ID");
+			} else {
+				log.error("User with StudentNumber " + studentNumber + " not found in SAKAI_USER_ID_MAP");
+			}
+
+		} catch (SQLException e) {
+			log.error("User with StudentNumber " + studentNumber + " not found in SAKAI_USER_ID_MAP");
+		} finally {
+			try {
+				if (prepStmt != null && !prepStmt.isClosed()) {
+					prepStmt.close();
+				}
+			} catch (SQLException e) {
+				log.error("User with StudentNumber " + studentNumber + " not found in SAKAI_USER_ID_MAP");
+			}
+		}
+		return null;
+	}
+
+	/**
 	 * @param siteId
 	 * @param sectionUsersMap
 	 * @param assignmentId
@@ -459,22 +488,19 @@ public final class NWUGradebookPublishUtil {
 				studentGradebookMarksPrepStmt.setString(counter++, siteId);
 
 				for (int i = 0; i < selectedStudentNumbersForModule.size(); i++) {
-					studentGradebookMarksPrepStmt.setString(counter++, selectedStudentNumbersForModule.get(i));
+					studentGradebookMarksPrepStmt.setString(counter++, getUUIDFromStudentNumber(selectedStudentNumbersForModule.get(i)));
 				}
 				studentGradebookMarksResultSet = studentGradebookMarksPrepStmt.executeQuery();
 
 				if (studentGradebookMarksResultSet.next() == false) {
-					System.out.println("ResultSet in empty");
-
-					System.out.println(sbSql.toString());
-					System.out.println(selectedStudentNumbersForModule);
-
 					log.info("No Grades found and republished to MPS, see error log for siteId: " + siteId + "; assignmentId: "
 							+ assignmentId);
+					log.info("ResultSet in empty: " + sbSql.toString() + "; studentNumbersForModule: "
+							+ studentNumbersForModule);
 				} else {
 
 					do {
-						studentNumber = studentGradebookMarksResultSet.getString("STUDENT_ID");
+						studentNumber = studentGradebookMarksResultSet.getString("EID");
 						grade = studentGradebookMarksResultSet.getDouble("POINTS_EARNED");
 						recordedDate = studentGradebookMarksResultSet.getTimestamp("DATE_RECORDED").toLocalDateTime();
 						assessmentName = studentGradebookMarksResultSet.getString("NAME");
@@ -681,7 +707,7 @@ public final class NWUGradebookPublishUtil {
 		studentMarkInfo.setMetaInfo(metaInfo);
 
 		try {
-			logMaintainStudentMarkData(studentGradeMap, studentMarkInfo);			
+			logMaintainStudentMarkData(studentGradeMap, studentMarkInfo);
 			MaintainStudentResponseWrapper result = studentAssessmentServiceCRUDService.maintainStudentMark(studentMarkInfo,
 					contextInfo);
 
@@ -713,7 +739,6 @@ public final class NWUGradebookPublishUtil {
 	}
 
 	/**
-	 * 
 	 * @param studentGradeMap
 	 * @param studentMarkInfo
 	 */
@@ -730,7 +755,7 @@ public final class NWUGradebookPublishUtil {
 		for (Entry<Integer, Double> entry : studentGradeMap.entrySet()) {
 			studentGradeMapStr.append("(").append(entry.getKey()).append(",").append(entry.getValue()).append(") ");
 		}
-		
+
 		log.info(studentGradeMapStr);
 	}
 
@@ -752,7 +777,7 @@ public final class NWUGradebookPublishUtil {
 		info.setPresentationCategoryTypeKey(modeOfDeliveryTypeKey);
 		info.setEnrolmentCategoryTypeKey(enrolmentCategoryTypeKey);
 		info.setModuleCode(moduleCode);
-		info.setSite(Integer.parseInt(moduleSite));
+		info.setSite(Integer.parseInt(moduleSite) * -1);
 
 		try {
 			List<ClassGroupInfo> result = studentAssessmentService.searchClassGroupsByCourseCriteria(info,
@@ -762,20 +787,22 @@ public final class NWUGradebookPublishUtil {
 				log.info("getClassGroupDescription result is empty");
 				return null;
 			}
-			
+
 			for (ClassGroupInfo classGroupInfo : result) {
-				if(classGroupInfo.getClassGroupTypeKey() != null && (classGroupInfo.getClassGroupTypeKey().equals(CLASS_GROUP_TYPE_COMPLETE) || 
-						classGroupInfo.getClassGroupTypeKey().equals(CLASS_GROUP_TYPE_VOLLEDIG))) {
+				if (classGroupInfo.getClassGroupTypeKey() != null
+						&& (classGroupInfo.getClassGroupTypeKey().equals(CLASS_GROUP_TYPE_COMPLETE)
+								|| classGroupInfo.getClassGroupTypeKey().equals(CLASS_GROUP_TYPE_VOLLEDIG))) {
 					log.info("Found ClassGroupDescription, for startDate: " + startDate + "; endDate: " + endDate
 							+ "; moduleCode: " + moduleCode + "; moduleSite: " + moduleSite + "; enrolmentCategoryTypeKey: "
-							+ enrolmentCategoryTypeKey + "; modeOfDeliveryTypeKey: " + modeOfDeliveryTypeKey + "; classGroupDescription: " + classGroupInfo.getClassGroupDescription());
+							+ enrolmentCategoryTypeKey + "; modeOfDeliveryTypeKey: " + modeOfDeliveryTypeKey
+							+ "; classGroupDescription: " + classGroupInfo.getClassGroupDescription());
 					return classGroupInfo.getClassGroupDescription();
 				}
-			}			
+			}
 
 		} catch (DoesNotExistException | InvalidParameterException | MissingParameterException | OperationFailedException
 				| PermissionDeniedException e) {
-			log.error("Could not find ClassGroupDescription, see error log for startDate: " + startDate + "; endDate: " + endDate
+			log.error("Could not find 	, see error log for startDate: " + startDate + "; endDate: " + endDate
 					+ "; moduleCode: " + moduleCode + "; moduleSite: " + moduleSite + "; enrolmentCategoryTypeKey: "
 					+ enrolmentCategoryTypeKey + "; modeOfDeliveryTypeKey: " + modeOfDeliveryTypeKey);
 
@@ -804,9 +831,9 @@ public final class NWUGradebookPublishUtil {
 	 * @param endDate
 	 * @param startDate
 	 */
-	private void republishGrades(String siteId, String module, List<String> moduleValues,
-			HashMap<Integer, Double> studentGradeMap, String siteTitle, String evalDescr, String evalShortDescr, double total,
-			LocalDateTime dueDate, LocalDateTime recordedDate, Date startDate, Date endDate) {
+	private void republishGrades(String siteId, String module, List<String> moduleValues, HashMap<Integer, Double> studentGradeMap,
+			String siteTitle, String evalDescr, String evalShortDescr, double total, LocalDateTime dueDate,
+			LocalDateTime recordedDate, Date startDate, Date endDate) {
 		log.info("republishGrades start");
 		log.info("		siteId = " + siteId);
 		log.info("		module = " + module);
@@ -868,10 +895,10 @@ public final class NWUGradebookPublishUtil {
 		studentMarkInfo.setMetaInfo(metaInfo);
 
 		try {
-			logMaintainStudentMarkData(studentGradeMap, studentMarkInfo);	
+			logMaintainStudentMarkData(studentGradeMap, studentMarkInfo);
 			MaintainStudentResponseWrapper result = studentAssessmentServiceCRUDService.maintainStudentMark(studentMarkInfo,
 					contextInfo);
-			
+
 			HashMap<String, String> maintainStudentResponse = result.getMaintainStudentResponse();
 			if (maintainStudentResponse == null) {
 				log.error("Response from republishGrades is empty for siteId: " + siteId + "; siteTitle: " + siteTitle
@@ -966,8 +993,8 @@ public final class NWUGradebookPublishUtil {
 	 * @param status
 	 * @param description
 	 */
-	private static void updateNWUGradebookRecordsWithStatus(String siteId, String module,
-			HashMap<Integer, Double> studentGradeMap, String status, String description) {
+	private static void updateNWUGradebookRecordsWithStatus(String siteId, String module, HashMap<Integer, Double> studentGradeMap,
+			String status, String description) {
 		PreparedStatement nwuGradebookRecordsUpdateStatusPrepStmt = null;
 		Integer studentNumber = null;
 		try {
@@ -1270,6 +1297,7 @@ public final class NWUGradebookPublishUtil {
 	private static void openDatabaseConnection() {
 		try {
 			connection = DriverManager.getConnection(dbUrl, dbUsername, dbPassword);
+			connection.setAutoCommit(true);
 			log.info("Database connection successfully made.");
 
 		} catch (Exception e) {

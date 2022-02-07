@@ -322,7 +322,7 @@ public class InsertProcess {
                 if (lecturerExists) {
                     LOG.info("Lecturer " + lecturer.getUserName() + " already exists.");
                 }
-                else {
+                else {                	
                     userDirectoryService.addUser(null, lecturer.getUserName(),
                         lecturer.getFirstName(), lecturer.getSurname(), lecturer.getEmail(),
                         lecturer.getPassword(), "maintain", null);

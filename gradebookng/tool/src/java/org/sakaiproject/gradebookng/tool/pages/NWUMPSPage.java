@@ -11,6 +11,7 @@ import org.apache.wicket.AttributeModifier;
 import org.apache.wicket.ajax.AjaxRequestTarget;
 import org.apache.wicket.ajax.markup.html.AjaxLink;
 import org.apache.wicket.ajax.markup.html.form.AjaxCheckBox;
+import org.apache.wicket.behavior.AttributeAppender;
 import org.apache.wicket.extensions.ajax.markup.html.modal.ModalWindow;
 import org.apache.wicket.extensions.ajax.markup.html.modal.ModalWindow.MaskType;
 import org.apache.wicket.extensions.ajax.markup.html.repeater.data.table.AjaxFallbackDefaultDataTable;
@@ -122,7 +123,15 @@ public class NWUMPSPage extends BasePage {
 						}
 					}
 				}
-			};
+			};			
+
+			GbAssignmentData rowData = (GbAssignmentData) model.getObject();
+			
+			//Mark checkbox "disabled" if StudentInfoDataList is not empty
+			if(rowData.getStudentInfoDataList() != null && !rowData.getStudentInfoDataList().isEmpty()) {
+				field.add(new AttributeAppender("disabled", "disabled"));
+			}
+			
 			add(field);
 		}
 

@@ -10,6 +10,7 @@ COURSEMANAGEMENT:
 2 cm-provider
 3 kernel
 4 providers
+5 niks
 
 SLINK
 1 sakai.properties Webservices change

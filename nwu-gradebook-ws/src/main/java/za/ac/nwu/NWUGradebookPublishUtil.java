@@ -269,7 +269,8 @@ public final class NWUGradebookPublishUtil {
 					studentGradebookMarksPrepStmt.setString(counter++, siteId);
 
 					for (int i = 0; i < studentNumbersForModule.size(); i++) {
-						studentGradebookMarksPrepStmt.setString(counter++, getUUIDFromStudentNumber(studentNumbersForModule.get(i)));
+//						studentGradebookMarksPrepStmt.setString(counter++, getUUIDFromStudentNumber(studentNumbersForModule.get(i)));
+						studentGradebookMarksPrepStmt.setString(counter++, studentNumbersForModule.get(i));
 					}
 					studentGradebookMarksResultSet = studentGradebookMarksPrepStmt.executeQuery();
 
@@ -692,7 +693,7 @@ public final class NWUGradebookPublishUtil {
 		studentMarkInfo.setModeOfDeliveryTypeKey(modeOfDeliveryTypeKey);
 		studentMarkInfo.setTermTypeKey(moduleOfferingInfo.getTermTypeKey());
 		studentMarkInfo.setModuleOrgEnt(Integer.parseInt(moduleOfferingInfo.getModuleOrgEnt()));
-		studentMarkInfo.setModuleSite(Integer.parseInt(moduleSite) * -1);
+		studentMarkInfo.setModuleSite(Integer.parseInt(moduleSite));
 		studentMarkInfo.setClassGroupDescription(classGroupDescr);
 		studentMarkInfo.setLanguageTypeKey(SYSTEM_LANGUAGE_TYPE_KEY);
 		studentMarkInfo.setEvaluationDesc(evalDescr);
@@ -880,7 +881,7 @@ public final class NWUGradebookPublishUtil {
 		studentMarkInfo.setModeOfDeliveryTypeKey(modeOfDeliveryTypeKey);
 		studentMarkInfo.setTermTypeKey(moduleOfferingInfo.getTermTypeKey());
 		studentMarkInfo.setModuleOrgEnt(Integer.parseInt(moduleOfferingInfo.getModuleOrgEnt()));
-		studentMarkInfo.setModuleSite(Integer.parseInt(moduleSite) * -1);
+		studentMarkInfo.setModuleSite(Integer.parseInt(moduleSite));
 		studentMarkInfo.setClassGroupDescription(classGroupDescr);
 		studentMarkInfo.setLanguageTypeKey(SYSTEM_LANGUAGE_TYPE_KEY);
 		studentMarkInfo.setEvaluationDesc(evalDescr);

@@ -287,7 +287,7 @@ public final class NWUGradebookPublishUtil {
 					} else {
 
 						do {
-							studentNumber = studentGradebookMarksResultSet.getString("EID");
+							studentNumber = studentGradebookMarksResultSet.getString("STUDENT_ID");
 							grade = studentGradebookMarksResultSet.getDouble("POINTS_EARNED");
 							recordedDate = studentGradebookMarksResultSet.getTimestamp("DATE_RECORDED").toLocalDateTime();
 							assessmentName = studentGradebookMarksResultSet.getString("NAME");
@@ -506,7 +506,7 @@ public final class NWUGradebookPublishUtil {
 				} else {
 
 					do {
-						studentNumber = studentGradebookMarksResultSet.getString("EID");
+						studentNumber = studentGradebookMarksResultSet.getString("STUDENT_ID");
 						grade = studentGradebookMarksResultSet.getDouble("POINTS_EARNED");
 						recordedDate = studentGradebookMarksResultSet.getTimestamp("DATE_RECORDED").toLocalDateTime();
 						assessmentName = studentGradebookMarksResultSet.getString("NAME");

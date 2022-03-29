@@ -97,9 +97,9 @@ public final class NWUGradebookPublishUtil {
 
 	private final static String SITE_TITLE_SELECT = "SELECT TITLE FROM sakai_site where SITE_ID = ?";
 
-	private final static String NWU_EVAL_DESCR_SELECT = "SELECT EVAL_DESCR FROM nwu_site_evaluation where SITE_ID = ? AND MODULE = ?";
-	private final static String NWU_EVAL_DESCRID_SELECT = "SELECT ID FROM nwu_site_evaluation where SITE_ID = ? AND MODULE = ? AND EVAL_DESCR = ?";
-	private final static String NWU_SITE_EVAL_INSERT = "INSERT INTO nwu_site_evaluation (SITE_ID, MODULE, EVAL_DESCR) VALUES (?,?,?)";
+	private final static String NWU_EVAL_DESCR_SELECT = "SELECT EVAL_DESCR FROM nwu_site_evaluation where SITE_ID = ? AND MODULE = ? AND ASSIGNMENT_ID = ?";
+	private final static String NWU_EVAL_DESCRID_SELECT = "SELECT ID FROM nwu_site_evaluation where SITE_ID = ? AND MODULE = ? AND ASSIGNMENT_ID = ? AND EVAL_DESCR = ?";
+	private final static String NWU_SITE_EVAL_INSERT = "INSERT INTO nwu_site_evaluation (SITE_ID, MODULE, ASSIGNMENT_ID, EVAL_DESCR) VALUES (?,?,?,?)";
 
 	private final static String SAKAI_USER_ID_SELECT = "SELECT USER_ID FROM SAKAI_USER_ID_MAP WHERE EID = ?";
 
@@ -250,8 +250,6 @@ public final class NWUGradebookPublishUtil {
 				module = (String) moduleEntry.getKey();
 				studentNumbersForModule = moduleEntry.getValue();
 				studentGradeMap = new HashMap<>();
-				evalShortDescr = getEvalShortDesc(siteId, module);
-				evalDescrId = getEvalDescId(siteId, module, evalShortDescr);
 
 				for (String assignmentId : assignmentIds) {
 
@@ -270,7 +268,8 @@ public final class NWUGradebookPublishUtil {
 					studentGradebookMarksPrepStmt = connection.prepareStatement(sbSql.toString());
 
 					int counter = 1;
-					studentGradebookMarksPrepStmt.setInt(counter++, Integer.parseInt(assignmentId));
+					int assignmentIdInt = Integer.parseInt(assignmentId);
+					studentGradebookMarksPrepStmt.setInt(counter++, assignmentIdInt);
 					studentGradebookMarksPrepStmt.setString(counter++, siteId);
 
 					for (int i = 0; i < studentNumbersForModule.size(); i++) {
@@ -292,9 +291,10 @@ public final class NWUGradebookPublishUtil {
 							recordedDate = studentGradebookMarksResultSet.getTimestamp("DATE_RECORDED").toLocalDateTime();
 							assessmentName = studentGradebookMarksResultSet.getString("NAME");
 
-							if (evalDescr == null) {
-								evalDescr = getEvaluationDesc(assessmentName);
-							}
+							evalShortDescr = getEvalShortDesc(siteId, module, assignmentIdInt);
+							evalDescrId = getEvalDescId(siteId, module, assignmentIdInt, evalShortDescr);
+							
+							evalDescr = getEvaluationDesc(assessmentName);
 
 							total = studentGradebookMarksResultSet.getDouble("POINTS_POSSIBLE");
 							dueDate = studentGradebookMarksResultSet.getTimestamp("DUE_DATE").toLocalDateTime();
@@ -472,11 +472,8 @@ public final class NWUGradebookPublishUtil {
 					continue;
 
 				studentGradeMap = new HashMap<>();
-				evalShortDescr = getEvalShortDesc(siteId, module);
-				evalDescrId = getEvalDescId(siteId, module, evalShortDescr);
-
 				assessmentName = null;
-				evalDescr = null;
+				
 				// # Get all student numbers and their grades for siteId and the date recorded between start and end date
 				StringBuilder sbSql = new StringBuilder();
 				sbSql.append(STUDENT_GRDB_MARKS_SELECT);
@@ -490,7 +487,8 @@ public final class NWUGradebookPublishUtil {
 				studentGradebookMarksPrepStmt = connection.prepareStatement(sbSql.toString());
 
 				int counter = 1;
-				studentGradebookMarksPrepStmt.setInt(counter++, Integer.parseInt(assignmentId));
+				int assignmentIdInt = Integer.parseInt(assignmentId);
+				studentGradebookMarksPrepStmt.setInt(counter++, assignmentIdInt);
 				studentGradebookMarksPrepStmt.setString(counter++, siteId);
 
 				for (int i = 0; i < selectedStudentNumbersForModule.size(); i++) {
@@ -511,9 +509,9 @@ public final class NWUGradebookPublishUtil {
 						recordedDate = studentGradebookMarksResultSet.getTimestamp("DATE_RECORDED").toLocalDateTime();
 						assessmentName = studentGradebookMarksResultSet.getString("NAME");
 
-						if (evalDescr == null) {
-							evalDescr = getEvaluationDesc(assessmentName);
-						}
+						evalShortDescr = getEvalShortDesc(siteId, module, assignmentIdInt);
+						evalDescrId = getEvalDescId(siteId, module, assignmentIdInt, evalShortDescr);
+						evalDescr = getEvaluationDesc(assessmentName);
 
 						total = studentGradebookMarksResultSet.getDouble("POINTS_POSSIBLE");
 						dueDate = studentGradebookMarksResultSet.getTimestamp("DUE_DATE").toLocalDateTime();
@@ -708,7 +706,7 @@ public final class NWUGradebookPublishUtil {
 		studentMarkInfo.setEvaluationNoOfSubmissions(1);
 		studentMarkInfo.setEvaluationSubminimum(0);
 		studentMarkInfo.setEvaluationAssessmentDateTime(Date.from(recordedDate.atZone(ZoneId.systemDefault()).toInstant()));
-		studentMarkInfo.setEvaluationIsRequiredForExam(true);
+		studentMarkInfo.setEvaluationIsRequiredForExam(false);
 		studentMarkInfo.setStudentAndMark(studentGradeMap);
 		studentMarkInfo.setMetaInfo(metaInfo);
 
@@ -896,7 +894,7 @@ public final class NWUGradebookPublishUtil {
 		studentMarkInfo.setEvaluationNoOfSubmissions(1);
 		studentMarkInfo.setEvaluationSubminimum(0);
 		studentMarkInfo.setEvaluationAssessmentDateTime(Date.from(recordedDate.atZone(ZoneId.systemDefault()).toInstant()));
-		studentMarkInfo.setEvaluationIsRequiredForExam(true);
+		studentMarkInfo.setEvaluationIsRequiredForExam(false);
 		studentMarkInfo.setStudentAndMark(studentGradeMap);
 		studentMarkInfo.setMetaInfo(metaInfo);
 
@@ -1343,74 +1341,82 @@ public final class NWUGradebookPublishUtil {
 	/**
 	 * @param siteId
 	 * @param module
+	 * @param assignmentId 
 	 * @return
 	 */
-	private static String getEvalShortDesc(String siteId, String module) {
+	private static String getEvalShortDesc(String siteId, String module, int assignmentId) {
 		String evalShortDesc = null;
 		PreparedStatement prepStmt = null;
 		try {
 			prepStmt = connection.prepareStatement(NWU_EVAL_DESCR_SELECT);
 			prepStmt.setString(1, siteId);
 			prepStmt.setString(2, module);
+			prepStmt.setInt(3, assignmentId);
 			ResultSet resultSet = prepStmt.executeQuery();
 			if (resultSet.next()) {
 				evalShortDesc = resultSet.getString("EVAL_DESCR");
 			}
 		} catch (SQLException e) {
-			log.error("Exception evaluation code for: siteId: " + siteId + "; module: " + module, e);
+			log.error("Exception evaluation code for: siteId: " + siteId + "; module: " + module + "; assignmentId: " + assignmentId, e);
 		} finally {
 			try {
 				if (prepStmt != null && !prepStmt.isClosed()) {
 					prepStmt.close();
 				}
 			} catch (SQLException e) {
-				log.error("Exception evaluation code for: siteId: " + siteId + "; module: " + module, e);
+				log.error("Exception evaluation code for: siteId: " + siteId + "; module: " + module + "; assignmentId: " + assignmentId, e);
 			}
 		}
 		// if it does not exist, generate one
 		if (evalShortDesc == null) {
-			evalShortDesc = generateEvalShortDesc(siteId, module);
+			evalShortDesc = generateEvalShortDesc(siteId, module, assignmentId);
 		}
 		return evalShortDesc;
 	}
 
 	/**
+	 * 
 	 * @param siteId
 	 * @param module
+	 * @param assignmentId
 	 * @param evalDescr
 	 * @return
+	 * @throws SQLException
 	 */
-	private static int getEvalDescId(String siteId, String module, String evalDescr) throws SQLException {
+	private static int getEvalDescId(String siteId, String module, int assignmentId, String evalDescr) throws SQLException {
 		PreparedStatement prepStmt = null;
 		try {
 			prepStmt = connection.prepareStatement(NWU_EVAL_DESCRID_SELECT);
 			prepStmt.setString(1, siteId);
 			prepStmt.setString(2, module);
-			prepStmt.setString(3, evalDescr);
+			prepStmt.setInt(3, assignmentId);
+			prepStmt.setString(4, evalDescr);
 			ResultSet resultSet = prepStmt.executeQuery();
 			if (resultSet.next()) {
 				return resultSet.getInt("ID");
 			}
 		} catch (SQLException e) {
-			log.error("Exception evaluation code for: siteId: " + siteId + "; module: " + module, e);
+			log.error("Exception evaluation code for: siteId: " + siteId + "; module: " + module + "; assignmentId: " + assignmentId, e);
 		} finally {
 			try {
 				if (prepStmt != null && !prepStmt.isClosed()) {
 					prepStmt.close();
 				}
 			} catch (SQLException e) {
-				log.error("Exception evaluation code for: siteId: " + siteId + "; module: " + module, e);
+				log.error("Exception evaluation code for: siteId: " + siteId + "; module: " + module + "; assignmentId: " + assignmentId, e);
 			}
 		}
 		return 0;
 	}
 
 	/**
+	 * 
 	 * @param siteId
 	 * @param module
+	 * @param assignmentId
 	 * @return
 	 */
-	private static String generateEvalShortDesc(String siteId, String module) {
+	private static String generateEvalShortDesc(String siteId, String module, int assignmentId) {
 		String randomStr = RandomStringUtils.random(5, true, true);
 		PreparedStatement prepStmt = null;
 		try {
@@ -1418,7 +1424,8 @@ public final class NWUGradebookPublishUtil {
 
 			prepStmt.setString(1, siteId);
 			prepStmt.setString(2, module);
-			prepStmt.setString(3, randomStr);
+			prepStmt.setInt(3, assignmentId);
+			prepStmt.setString(4, randomStr);
 
 			// execute the preparedstatement
 			int count = prepStmt.executeUpdate();
@@ -1426,7 +1433,7 @@ public final class NWUGradebookPublishUtil {
 				return randomStr;
 			}
 		} catch (SQLException e) {
-			log.error("Could not insert random evaluation code for: siteId: " + siteId + "; module: " + module + "; randomStr: "
+			log.error("Could not insert random evaluation code for: siteId: " + siteId + "; module: " + module + "; assignmentId: " + assignmentId + "; randomStr: "
 					+ randomStr, e);
 		} finally {
 			try {
@@ -1434,7 +1441,7 @@ public final class NWUGradebookPublishUtil {
 					prepStmt.close();
 				}
 			} catch (SQLException e) {
-				log.error("Could not insert random evaluation code for: siteId: " + siteId + "; module: " + module
+				log.error("Could not insert random evaluation code for: siteId: " + siteId + "; module: " + module + "; assignmentId: " + assignmentId
 						+ "; randomStr: " + randomStr, e);
 			}
 		}

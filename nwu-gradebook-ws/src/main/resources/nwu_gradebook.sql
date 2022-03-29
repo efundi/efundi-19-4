@@ -29,6 +29,7 @@ CREATE TABLE `nwu_site_evaluation` (
   `ID` bigint(20) NOT NULL AUTO_INCREMENT,
   `SITE_ID` varchar(255) NOT NULL,
   `MODULE` varchar(255) NOT NULL,
+  `ASSIGNMENT_ID` BIGINT(20) NOT NULL,
   `EVAL_DESCR` varchar(255) NOT NULL,
   PRIMARY KEY (`ID`),
   KEY `SITE_ID_FI_1` (`SITE_ID`),

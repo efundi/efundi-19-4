@@ -376,7 +376,7 @@ public class PublishNWUGradebookData {
 		studentMarkInfo.setEvaluationNoOfSubmissions(1);
 		studentMarkInfo.setEvaluationSubminimum(0);
 		studentMarkInfo.setEvaluationAssessmentDateTime(Date.from(recordedDate.atZone(ZoneId.systemDefault()).toInstant()));
-		studentMarkInfo.setEvaluationIsRequiredForExam(true);
+		studentMarkInfo.setEvaluationIsRequiredForExam(false);
 		studentMarkInfo.setStudentAndMark(studentGradeMap);
 		studentMarkInfo.setMetaInfo(metaInfo);
 

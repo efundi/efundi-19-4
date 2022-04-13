@@ -176,6 +176,7 @@ public class BasePage extends WebPage {
 		this.settingsPageLink.add(new Label("screenreaderlabel", getString("link.screenreader.tabnotselected")));
 		nav.add(this.settingsPageLink);
 		
+
 		// nwumps page
 		this.nwumpsPageLink = new Link<Void>("nwumpsPageLink") {
 			private static final long serialVersionUID = 1L;
@@ -187,11 +188,12 @@ public class BasePage extends WebPage {
 
 			@Override
 			public boolean isVisible() {
-				return (businessService.isUserAbleToEditAssessments());
+				return (businessService.isUserAbleToViewMPS());
 			}
 		};
 		this.nwumpsPageLink.add(new Label("screenreaderlabel", getString("link.screenreader.tabnotselected")));
 		nav.add(this.nwumpsPageLink);
+		nwumpsPageLink.setVisible(nwumpsPageLink.isVisible());
 
 		add(nav);
 

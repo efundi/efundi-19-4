@@ -493,7 +493,7 @@ public final class NWUGradebookPublishUtil {
 
 				for (int i = 0; i < selectedStudentNumbersForModule.size(); i++) {
 //					studentGradebookMarksPrepStmt.setString(counter++, getUUIDFromStudentNumber(selectedStudentNumbersForModule.get(i)));
-					studentGradebookMarksPrepStmt.setString(counter++, studentNumbersForModule.get(i));
+					studentGradebookMarksPrepStmt.setString(counter++, selectedStudentNumbersForModule.get(i));
 				}
 				studentGradebookMarksResultSet = studentGradebookMarksPrepStmt.executeQuery();
 
@@ -702,7 +702,7 @@ public final class NWUGradebookPublishUtil {
 		studentMarkInfo.setLanguageTypeKey(SYSTEM_LANGUAGE_TYPE_KEY);
 		studentMarkInfo.setEvaluationDesc(evalDescr);
 		studentMarkInfo.setEvaluationShortDesc(evalShortDescr);
-//		studentMarkInfo.setEvaluationCutOffDate(Date.from(dueDate.atZone(ZoneId.systemDefault()).toInstant()));
+		studentMarkInfo.setEvaluationCutOffDate(Date.from(dueDate.atZone(ZoneId.systemDefault()).toInstant()));
 		studentMarkInfo.setEvaluationMarkOutOff((int) total);
 		studentMarkInfo.setEvaluationNoOfSubmissions(1);
 		studentMarkInfo.setEvaluationSubminimum(0);
@@ -890,7 +890,7 @@ public final class NWUGradebookPublishUtil {
 		studentMarkInfo.setLanguageTypeKey(SYSTEM_LANGUAGE_TYPE_KEY);
 		studentMarkInfo.setEvaluationDesc(evalDescr);
 		studentMarkInfo.setEvaluationShortDesc(evalShortDescr);
-//		studentMarkInfo.setEvaluationCutOffDate(Date.from(dueDate.atZone(ZoneId.systemDefault()).toInstant()));
+		studentMarkInfo.setEvaluationCutOffDate(Date.from(dueDate.atZone(ZoneId.systemDefault()).toInstant()));
 		studentMarkInfo.setEvaluationMarkOutOff((int) total);
 		studentMarkInfo.setEvaluationNoOfSubmissions(1);
 		studentMarkInfo.setEvaluationSubminimum(0);

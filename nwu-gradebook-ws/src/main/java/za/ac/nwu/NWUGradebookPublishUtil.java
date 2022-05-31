@@ -468,7 +468,7 @@ public final class NWUGradebookPublishUtil {
 				selectedStudentNumbersForModule = new ArrayList<String>();
 
 				getStudentNumbersForModule(selectedStudentNumbersForModule, selectedStudentInfoIds, studentNumbersForModule);
-				if (selectedStudentNumbersForModule == null)
+				if (selectedStudentNumbersForModule == null || selectedStudentNumbersForModule.isEmpty() )
 					continue;
 
 				studentGradeMap = new HashMap<>();

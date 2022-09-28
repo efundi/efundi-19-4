@@ -1,5 +1,9 @@
 package za.ac.nwu;
 
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -23,6 +27,11 @@ import java.util.Map.Entry;
 import java.util.StringTokenizer;
 import java.util.stream.Collectors;
 
+import javax.jws.WebService;
+import javax.xml.namespace.QName;
+import javax.xml.ws.BindingProvider;
+import javax.xml.ws.Service;
+
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
@@ -43,12 +52,12 @@ import assemble.edu.exceptions.OperationFailedException;
 import assemble.edu.exceptions.PermissionDeniedException;
 import nwu.student.assesment.service.StudentAssessmentService;
 import nwu.student.assesment.service.crud.StudentAssessmentServiceCRUD;
-import nwu.student.assesment.service.crud.factory.StudentAssessmentCRUDServiceClientFactory;
 import nwu.student.assesment.service.dto.ClassGroupCourseCriteriaInfo;
 import nwu.student.assesment.service.dto.ClassGroupInfo;
 import nwu.student.assesment.service.dto.MaintainStudentResponseWrapper;
 import nwu.student.assesment.service.dto.StudentMarkInfo;
 import nwu.student.assesment.service.factory.StudentAssessmentServiceClientFactory;
+import za.ac.nwu.registry.EtcdRegistryClient;
 
 /**
  * @author Joseph Gillman
@@ -1233,34 +1242,27 @@ public final class NWUGradebookPublishUtil {
 		}
 
 		if (studentAssessmentServiceCRUDService == null) {
-			String studentServiceLookupKey = ServiceRegistryLookupUtility.getServiceRegistryLookupKey(
-					properties.getWSRuntimeEnvironment(), StudentAssessmentCRUDServiceClientFactory.STUDENTASSESSMENTCRUDSERVICE,
-					properties.getWSMajorVersion(), properties.getWSDatabase());
 
-			try {
-				studentAssessmentServiceCRUDService = (StudentAssessmentServiceCRUD) GenericServiceClientFactory.getService(
-						studentServiceLookupKey, properties.getWSUsername(), properties.getWSPassword(),
-						StudentAssessmentServiceCRUD.class);
-			} catch (PermissionDeniedException e) {
-				log.error(
-						"initializeWebserviceObjects - Initializing StudentAssessmentServiceCRUD failed with PermissionDeniedException: ",
-						e);
-				return false;
-			} catch (DoesNotExistException e) {
-				log.error(
-						"initializeWebserviceObjects - Initializing StudentAssessmentServiceCRUD failed with DoesNotExistException: ",
-						e);
-				return false;
-			} catch (MissingParameterException e) {
-				log.error(
-						"initializeWebserviceObjects - Initializing StudentAssessmentServiceCRUD failed with MissingParameterException: ",
-						e);
-			} catch (OperationFailedException e) {
-				log.error(
-						"initializeWebserviceObjects - Initializing StudentAssessmentServiceCRUD failed with OperationFailedException: ",
-						e);
-				return false;
-			}
+	        String wsdlURL = null;
+	        EtcdRegistryClient wsRegistry = new EtcdRegistryClient();
+	        try {
+	            wsdlURL = wsRegistry.getWSEndpoint(properties.getWSStudentAssessmentEnvTypeKey());
+	        } catch (DoesNotExistException | MissingParameterException | NoSuchAlgorithmException | KeyManagementException |
+	                OperationFailedException e) {
+	            log.error("initializeWebserviceObjects - Initializing StudentAssessmentServiceCRUD failed - Unable to get soap wsdl from etcd properties.");
+	        }
+
+	        WebService webService = StudentAssessmentServiceCRUD.class.getAnnotation(WebService.class);
+	        if (wsdlURL != null) {
+	            try {
+	            	studentAssessmentServiceCRUDService =
+	                        (StudentAssessmentServiceCRUD)
+	                                setupServicePort(new URL(wsdlURL), webService.targetNamespace(), webService.name(),
+	                                        StudentAssessmentServiceCRUD.class, wsdlURL);
+	            } catch (PermissionDeniedException | MalformedURLException e) {
+	                log.error("Unable to create service client for StudentAssessmentServiceCRUD.");
+	            }
+	        }
 		}
 
 		if (courseOfferingService == null) {
@@ -1293,6 +1295,22 @@ public final class NWUGradebookPublishUtil {
 		log.info("Initializing Webservice Objects was successful.");
 		return true;
 	}
+	
+	 public static Object setupServicePort(URL url, String nameSpace, String serviceName,
+             Class interfaceClass, String serviceWSDL) throws PermissionDeniedException {
+
+		 QName qname = new QName(nameSpace, serviceName);
+		 Service createdService = Service.create(url, qname);
+
+		 Object servicePort = createdService.getPort(interfaceClass);
+		 BindingProvider prov = (BindingProvider) servicePort;
+		 prov.getRequestContext().put("javax.xml.ws.security.auth.username", properties.getWSStudentAssessmentUsername());
+		 prov.getRequestContext().put("javax.xml.ws.security.auth.password", properties.getWSStudentAssessmentPassword());
+		 prov.getRequestContext().put("javax.xml.ws.client.connectionTimeout", properties.getWSStudentAssessmentConnectionTimeout());
+		 prov.getRequestContext().put("javax.xml.ws.client.receiveTimeout", properties.getWSStudentAssessmentReceiveTimeout());
+
+		 return servicePort;
+	 }
 
 	/**
 	 * Opens Database connection

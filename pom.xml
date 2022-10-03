@@ -77,7 +77,6 @@
                 <module>jsf</module>
                 <module>jsf2</module>
                 <module>kernel</module>
-                <module>lessonbuilder</module>
                 <module>library</module>
                 <module>login</module>
                 <module>mailarchive</module>
@@ -164,7 +163,6 @@
                 <module>jobscheduler</module>
                 <module>jsf</module>
                 <module>kernel</module>
-                <module>lessonbuilder</module>
                 <module>library</module>
                 <module>login</module>
                 <module>mailarchive</module>

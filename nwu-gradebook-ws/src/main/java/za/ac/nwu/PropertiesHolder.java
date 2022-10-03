@@ -21,6 +21,11 @@ public class PropertiesHolder {
     private String wsRuntimeEnvironment;
     private String wsUsername;
     private String wsPassword;
+    private String wsStudentAssessmentEnvTypeKey;    
+    private String wsStudentAssessmentUsername;    
+    private String wsStudentAssessmentPassword;
+    private String wsStudentAssessmentConnectionTimeout;    
+    private String wsStudentAssessmentReceiveTimeout;
     
     private String wsMetaInfoCreateId;
     private String wsMetaInfoAuditFunction;
@@ -52,6 +57,11 @@ public class PropertiesHolder {
     public String getWSRuntimeEnvironment() { return wsRuntimeEnvironment; }
     public String getWSUsername() { return wsUsername; }
     public String getWSPassword() { return wsPassword; }
+    public String getWSStudentAssessmentEnvTypeKey() { return wsStudentAssessmentEnvTypeKey; }
+    public String getWSStudentAssessmentUsername() { return wsStudentAssessmentUsername; }
+    public String getWSStudentAssessmentPassword() { return wsStudentAssessmentPassword; }
+    public String getWSStudentAssessmentConnectionTimeout() { return wsStudentAssessmentConnectionTimeout; }
+    public String getWSStudentAssessmentReceiveTimeout() { return wsStudentAssessmentReceiveTimeout; }
     public String getWSMetaInfoCreateId() { return wsMetaInfoCreateId; }
     public String getWSMetaInfoAuditFunction() { return wsMetaInfoAuditFunction; }
     public String getWSModuleEnvTypeKey() { return wsModuleEnvTypeKey; }
@@ -96,6 +106,16 @@ public class PropertiesHolder {
                 this.wsUsername = value;
             } else if ("ws.password".equals(prop)) {
                 this.wsPassword = value;
+            } else if ("ws.student.assessment.env.type.key".equals(prop)) {
+                this.wsStudentAssessmentEnvTypeKey = value;
+            } else if ("ws.student.assessment.username".equals(prop)) {
+                this.wsStudentAssessmentUsername = value;
+            } else if ("ws.student.assessment.password".equals(prop)) {
+                this.wsStudentAssessmentPassword = value;
+            } else if ("ws.student.assessment.connectionTimeout".equals(prop)) {
+                this.wsStudentAssessmentConnectionTimeout = value;
+            } else if ("ws.student.assessment.receiveTimeout".equals(prop)) {
+                this.wsStudentAssessmentReceiveTimeout = value;
             } else if ("ws.metaInfo.createId".equals(prop)) {
                 this.wsMetaInfoCreateId = value;
             } else if ("ws.metaInfo.auditFunction".equals(prop)) {
